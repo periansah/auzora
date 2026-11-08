@@ -1,7 +1,11 @@
 # api/index.py  -- Backend gabungan: Musik + Lirik (FastAPI + ytmusicapi)
+import json
+import re
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import urlparse
 
-from fastapi import FastAPI, Response
+from fastapi import Body, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from ytmusicapi import YTMusic
@@ -123,5 +127,100 @@ def get_album_info(browse_id: str, response: Response):
         data = ytmusic.get_album(browse_id)
         response.headers["Cache-Control"] = CACHE_LYRICS
         return {"status": "success", "data": data}
+    except Exception as e:
+        return error(str(e))
+
+
+# --- Impor playlist Spotify / Apple Music (tempel link) ---
+UA = {"User-Agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36"}
+
+
+def _fetch(url: str) -> str:
+    req = urllib.request.Request(url, headers=UA)
+    with urllib.request.urlopen(req, timeout=8) as r:
+        return r.read().decode("utf-8", "ignore")
+
+
+def _find(o, key):
+    if isinstance(o, dict):
+        if key in o:
+            return o[key]
+        for v in o.values():
+            r = _find(v, key)
+            if r is not None:
+                return r
+    elif isinstance(o, list):
+        for v in o:
+            r = _find(v, key)
+            if r is not None:
+                return r
+    return None
+
+
+def _spotify(path: str):
+    m = re.search(r"/(playlist|album)/([A-Za-z0-9]+)", path)
+    if not m:
+        raise ValueError("Link Spotify tidak dikenali")
+    html = _fetch(f"https://open.spotify.com/embed/{m.group(1)}/{m.group(2)}")
+    nd = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.S)
+    if not nd:
+        raise ValueError("Playlist Spotify tidak bisa dibaca (mungkin privat)")
+    data = json.loads(nd.group(1))
+    ent = _find(data, "entity") or {}
+    tl = _find(data, "trackList") or []
+    cover = ((ent.get("coverArt") or {}).get("sources") or [{}])[0].get("url", "")
+    tracks = [{"title": t.get("title", ""), "artist": t.get("subtitle", "")} for t in tl[:100] if t.get("title")]
+    return {"name": ent.get("name") or ent.get("title") or "Playlist Spotify", "img": cover, "tracks": tracks}
+
+
+def _apple(url: str):
+    html = _fetch(url)
+    name, tracks = "Playlist Apple Music", []
+    for blk in re.findall(r'<script[^>]+application/ld\+json[^>]*>(.*?)</script>', html, re.S):
+        try:
+            d = json.loads(blk)
+        except Exception:
+            continue
+        for item in (d if isinstance(d, list) else [d]):
+            if isinstance(item, dict) and item.get("track"):
+                name = item.get("name") or name
+                for t in item["track"]:
+                    by = t.get("byArtist")
+                    by = by[0] if isinstance(by, list) and by else by
+                    tracks.append({"title": t.get("name", ""), "artist": (by or {}).get("name", "") if isinstance(by, dict) else ""})
+    img = re.search(r'<meta property="og:image" content="([^"]+)"', html)
+    if not tracks:
+        raise ValueError("Playlist Apple Music tidak bisa dibaca")
+    return {"name": name, "img": img.group(1) if img else "", "tracks": [t for t in tracks if t["title"]][:200]}
+
+
+@app.get("/api/import")
+def import_playlist(url: str):
+    try:
+        u = urlparse(url.strip())
+        host = (u.hostname or "").lower()
+        if host == "open.spotify.com":
+            data = _spotify(u.path)
+        elif host in ("music.apple.com", "itunes.apple.com"):
+            data = _apple(url.strip())
+        else:
+            return error("Hanya link Spotify atau Apple Music yang didukung")
+        return JSONResponse({"status": "success", "data": data}, headers={"Cache-Control": "public, s-maxage=600"})
+    except Exception as e:
+        return error(str(e))
+
+
+# --- Proxy DeepL (opsional, butuh API key milik pengguna; browser tidak boleh memanggil DeepL langsung) ---
+@app.post("/api/deepl")
+def deepl(payload: dict = Body(...)):
+    try:
+        key = str(payload.get("key", "")).strip()
+        host = "api-free.deepl.com" if key.endswith(":fx") else "api.deepl.com"
+        body = json.dumps({"text": [payload.get("text", "")], "target_lang": str(payload.get("target", "ID")).upper()}).encode()
+        req = urllib.request.Request(f"https://{host}/v2/translate", data=body, method="POST",
+                                     headers={"Authorization": "DeepL-Auth-Key " + key, "Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            out = json.loads(r.read())
+        return {"status": "success", "data": out["translations"][0]["text"]}
     except Exception as e:
         return error(str(e))
