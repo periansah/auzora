@@ -114,3 +114,21 @@ body::after{height:120px}
 }
 
 .au-pg{height:6px;border-radius:3px;background:rgba(255,255,255,.15);margin-top:12px;overflow:hidden}.au-pg i{display:block;height:100%;width:0;background:#1ed760;transition:width .2s}
+
+/* v3.3.3 animasi masuk "auzora" */
+#auSplash{position:fixed;inset:0;z-index:99999;background:#07080d;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;transition:opacity .6s ease,transform .7s cubic-bezier(.2,.7,.2,1)}
+#auSplash.out{opacity:0;transform:scale(1.08);pointer-events:none}
+.sp-orb{position:absolute;width:62vmax;height:62vmax;border-radius:50%;opacity:0;animation:spOrb 2.2s ease-out forwards}
+.sp-orb.a{background:radial-gradient(circle,rgba(30,215,96,.38),rgba(30,215,96,0) 62%);left:-18vmax;top:-12vmax}
+.sp-orb.b{background:radial-gradient(circle,rgba(120,90,255,.4),rgba(120,90,255,0) 62%);right:-20vmax;bottom:-16vmax;animation-delay:.2s}
+@keyframes spOrb{0%{opacity:0;transform:scale(.6)}60%{opacity:1}100%{opacity:.9;transform:scale(1.08) translate(2vmax,-2vmax)}}
+.sp-word{position:relative;display:flex;font-family:'Unbounded','Poppins',system-ui,sans-serif;font-size:clamp(36px,13vw,84px);font-weight:700;letter-spacing:0;color:#fff;line-height:1.1}
+.sp-word span{display:inline-block;opacity:0;transform:translateY(34px) scale(.92);filter:blur(12px);animation:spLet .8s cubic-bezier(.2,.8,.2,1) forwards}
+.sp-word span:nth-child(1){animation-delay:.25s}.sp-word span:nth-child(2){animation-delay:.33s}.sp-word span:nth-child(3){animation-delay:.41s}
+.sp-word span:nth-child(4){animation-delay:.49s}.sp-word span:nth-child(5){animation-delay:.57s}.sp-word span:nth-child(6){animation-delay:.65s}
+@keyframes spLet{to{opacity:1;transform:none;filter:blur(0)}}
+.sp-line{position:relative;height:3px;width:0;margin-top:18px;border-radius:2px;background:linear-gradient(90deg,#1ed760,#9b8cff);animation:spLine .9s .95s cubic-bezier(.2,.8,.2,1) forwards}
+@keyframes spLine{to{width:min(52vw,260px)}}
+.sp-sub{position:relative;margin-top:14px;font-size:13px;letter-spacing:.32em;text-transform:uppercase;color:rgba(255,255,255,.6);opacity:0;animation:spSub .7s 1.2s ease forwards}
+@keyframes spSub{to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.sp-orb,.sp-word span,.sp-line,.sp-sub{animation-duration:.01s;animation-delay:0s}.sp-line{width:min(52vw,260px)}}

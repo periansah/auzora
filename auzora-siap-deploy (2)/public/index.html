@@ -31,11 +31,21 @@
     </script>
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/174/174872.png">
     
-    <link rel="stylesheet" href="/style.css?v=336">
-    <link rel="stylesheet" href="/features.css?v=336">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700&text=auzora&display=block">
+    <link rel="stylesheet" href="/style.css?v=338">
+    <link rel="stylesheet" href="/features.css?v=338">
     <script src="https://www.youtube.com/iframe_api"></script>
 </head>
 <body>
+<div id="auSplash" aria-hidden="true">
+    <div class="sp-orb a"></div><div class="sp-orb b"></div>
+    <div class="sp-word"><span>a</span><span>u</span><span>z</span><span>o</span><span>r</span><span>a</span></div>
+    <div class="sp-line"></div>
+    <div class="sp-sub">music &amp; lyrics</div>
+</div>
+<script>(function(){var s=document.getElementById('auSplash');if(!s)return;try{if(sessionStorage.getItem('auSp')){s.remove();return;}sessionStorage.setItem('auSp','1');}catch(e){}var d=false;function go(){if(d)return;d=true;s.classList.add('out');setTimeout(function(){s.remove();},700);}setTimeout(go,2400);s.addEventListener('click',go);})();</script>
 
     <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
         <defs>
@@ -454,7 +464,7 @@
 
     <div id="youtube-player"></div>
 
-    <script src="/script.js?v=336"></script>
-    <script src="/features.js?v=336"></script>
+    <script src="/script.js?v=338"></script>
+    <script src="/features.js?v=338"></script>
 </body>
 </html>
