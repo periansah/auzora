@@ -565,9 +565,11 @@ window.updateMediaSession = function () {
 
 /* ---------- foto profil: ketuk ikon profil untuk mengganti ---------- */
 const DEF_AVATAR = '3403e1f706f9d5569398b55a35689eda.jpg';
+/* hanya Beranda, Cari, Koleksi. Foto di halaman Developer & playlist sengaja tidak ikut berubah. */
+const AV_SEL = '#view-home .profile-icon, #view-search .profile-icon, #view-library .profile-icon';
 function applyAvatar() {
     const u = pref.get('auAvatar', '') || DEF_AVATAR;
-    $$('.profile-icon, .dev-profile-pic').forEach(i => { if (i.getAttribute('src') !== u) i.setAttribute('src', u); });
+    $$(AV_SEL).forEach(i => { if (i.getAttribute('src') !== u) i.setAttribute('src', u); });
 }
 function resizeAvatar(file) {
     return new Promise((res, rej) => {
@@ -612,7 +614,7 @@ function initAvatar() {
         });
         document.body.appendChild(f);
     }
-    document.addEventListener('click', e => { if (e.target.closest && e.target.closest('.profile-icon')) avatarSheet(); });
+    document.addEventListener('click', e => { if (e.target.closest && e.target.closest(AV_SEL)) avatarSheet(); });
     applyAvatar();
 }
 
