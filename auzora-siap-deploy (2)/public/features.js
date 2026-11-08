@@ -563,11 +563,64 @@ window.updateMediaSession = function () {
     }).catch(() => {});
 };
 
+/* ---------- foto profil: ketuk ikon profil untuk mengganti ---------- */
+const DEF_AVATAR = '3403e1f706f9d5569398b55a35689eda.jpg';
+function applyAvatar() {
+    const u = pref.get('auAvatar', '') || DEF_AVATAR;
+    $$('.profile-icon, .dev-profile-pic').forEach(i => { if (i.getAttribute('src') !== u) i.setAttribute('src', u); });
+}
+function resizeAvatar(file) {
+    return new Promise((res, rej) => {
+        const url = URL.createObjectURL(file), img = new Image();
+        img.onload = () => {
+            const S = 256, c = document.createElement('canvas'); c.width = c.height = S;
+            const x = c.getContext('2d'), m = Math.min(img.width, img.height);
+            x.drawImage(img, (img.width - m) / 2, (img.height - m) / 2, m, m, 0, 0, S, S);   // potong persegi di tengah
+            URL.revokeObjectURL(url);
+            res(c.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('bad image')); };
+        img.src = url;
+    });
+}
+function avatarSheet() {
+    const cur = pref.get('auAvatar', '') || DEF_AVATAR;
+    const o = sheet('<div class="sheet-title">Foto profil</div>' +
+        '<img src="' + cur + '" style="width:96px;height:96px;border-radius:50%;object-fit:cover;display:block;margin:8px auto 12px;border:2px solid rgba(255,255,255,.3)" alt="Foto profil">' +
+        '<div class="track-menu-item" data-a="pick"><svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg><span>Ganti foto profil</span></div>' +
+        (pref.get('auAvatar', '') ? '<div class="track-menu-item" data-a="reset"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg><span>Hapus foto (kembali ke bawaan)</span></div>' : '') +
+        '<div class="track-menu-item" data-a="close"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg><span>Batal</span></div>');
+    o.addEventListener('click', e => {
+        const b = e.target.closest('[data-a]'); if (!b) return;
+        const a = b.dataset.a;
+        if (a === 'pick') { const f = $('#auAvatarInput'); if (f) f.click(); }
+        else if (a === 'reset') { pref.set('auAvatar', ''); applyAvatar(); closeSheet(); showToast('Foto profil dikembalikan.'); }
+        else closeSheet();
+    });
+}
+function initAvatar() {
+    if (!$('#auAvatarInput')) {
+        const f = document.createElement('input');
+        f.type = 'file'; f.accept = 'image/*'; f.id = 'auAvatarInput'; f.style.display = 'none';
+        f.addEventListener('change', async () => {
+            const file = f.files && f.files[0]; f.value = '';
+            if (!file) return;
+            try {
+                const d = await resizeAvatar(file);
+                pref.set('auAvatar', d); applyAvatar(); closeSheet(); showToast('Foto profil diperbarui.');
+            } catch (e) { showToast('Gambar tidak bisa dibaca.'); }
+        });
+        document.body.appendChild(f);
+    }
+    document.addEventListener('click', e => { if (e.target.closest && e.target.closest('.profile-icon')) avatarSheet(); });
+    applyAvatar();
+}
+
 /* ---------- init ---------- */
 function init() {
     document.body.append(I, W, AMB, AR); applyIsl();
     const wp = pref.get('auWPos', ''); if (wp.includes('|')) { const p = wp.split('|'); W.style.left = p[0]; W.style.top = p[1]; W.style.right = 'auto'; }
-    initSettingsCard(); initSearch(); initStats();
+    initSettingsCard(); initSearch(); initStats(); initAvatar();
     const cap = $('#playerModal .glass-capsule');
     if (cap) cap.insertAdjacentHTML('beforeend', '<button data-au="amb2"><svg viewBox="0 0 24 24"><path d="M12 7a5 5 0 100 10 5 5 0 000-10zM2 13h2v-2H2v2zm18 0h2v-2h-2v2zM11 2v2h2V2h-2zm0 18v2h2v-2h-2z"/></svg><span>Ambient</span></button><button data-au="pip2"><svg viewBox="0 0 24 24"><path d="M19 7h-8v6h8V7zm2-4H3c-1.1 0-2 .9-2 2v14c0 1.1.9 1.98 2 1.98h18c1.1 0 2-.88 2-1.98V5c0-1.1-.9-2-2-2zm0 16.01H3V4.98h18v14.03z"/></svg><span>Melayang</span></button>');
     const hd = $('#lyricsModal .lyric-actions');
