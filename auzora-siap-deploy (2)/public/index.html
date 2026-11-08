@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#07080d">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/174/174872.png">
     
-    <link rel="stylesheet" href="/style.css?v=320">
+    <link rel="stylesheet" href="/style.css?v=321">
     <script src="https://www.youtube.com/iframe_api"></script>
 </head>
 <body>
@@ -191,33 +191,6 @@
     </div>
 
 
-    <!-- ===== DYNAMIC BAR (gaya Dynamic Island) ===== -->
-    <div id="dynIsland" class="dyn-island" data-state="hidden" aria-live="polite">
-        <div class="di-compact" onclick="toggleIsland()">
-            <img id="diImg" class="di-cover" src="" alt="Cover">
-            <div class="di-text">
-                <div id="diTitle" class="di-title">Judul Lagu</div>
-                <div id="diArtist" class="di-artist">Artis</div>
-            </div>
-            <div class="di-eq" id="diEq" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-        </div>
-        <div class="di-expanded">
-            <div class="di-progress" onclick="islandSeek(event)">
-                <div class="di-progress-fill" id="diProgressFill"></div>
-            </div>
-            <div class="di-times"><span id="diCur">0:00</span><span id="diTot">0:00</span></div>
-            <div class="di-controls">
-                <svg viewBox="0 0 24 24" onclick="openLyricsForCurrent()" aria-label="Lirik"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 20V4h6v6h6v10H6zm2-7h8v2H8v-2zm0 4h5v2H8v-2z"></path></svg>
-                <svg viewBox="0 0 24 24" onclick="playPrev()" aria-label="Sebelumnya"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"></path></svg>
-                <div class="di-play" onclick="togglePlay()" aria-label="Putar/Jeda">
-                    <svg id="diPlayBtn" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>
-                </div>
-                <svg viewBox="0 0 24 24" onclick="playNextSimilarSong()" aria-label="Berikutnya"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"></path></svg>
-                <svg viewBox="0 0 24 24" onclick="expandPlayer()" aria-label="Buka pemutar"><path d="M21 11V3h-8l3.29 3.29-10 10L3 13v8h8l-3.29-3.29 10-10z"></path></svg>
-            </div>
-        </div>
-    </div>
-
     <div id="miniPlayer" class="mini-player" onclick="expandPlayer()" style="display:none;">
         <img id="miniPlayerImg" src="https://via.placeholder.com/40" alt="Cover">
         <div class="mini-player-info">
@@ -380,6 +353,6 @@
 
     <div id="youtube-player"></div>
 
-    <script src="/script.js?v=320"></script>
+    <script src="/script.js?v=321"></script>
 </body>
 </html>
