@@ -368,31 +368,41 @@ function lyrImgSheet() {
 }
 
 /* ---------- Impor playlist Spotify / Apple Music ---------- */
+function spUrl(t) {       // ambil link dari teks yang ditempel (bisa berisi kalimat bagikan atau URI spotify:playlist:ID)
+    t = (t || '').trim();
+    const u = t.match(/spotify:(playlist|album):([A-Za-z0-9]+)/); if (u) return 'https://open.spotify.com/' + u[1] + '/' + u[2];
+    const m = t.match(/https?:\/\/[^\s]+/); return m ? m[0] : t;
+}
 function importSheet() {
-    const o = sheet('<div class="sheet-title">Impor playlist</div><label>Tempel link Spotify atau Apple Music</label><input type="text" id="auUrl" placeholder="https://open.spotify.com/playlist/..."><div id="auImpSt" class="queue-note" style="margin-top:12px">Spotify dibaca sampai 100 lagu pertama. Playlist harus publik.</div><div style="margin-top:16px"><button class="au-btn" id="auImpGo">Impor</button></div>');
-    $('#auImpGo', o).onclick = async () => {
-        const url = $('#auUrl', o).value.trim(), st = $('#auImpSt', o); if (!url) return;
-        st.textContent = 'Membaca playlist...';
+    const o = sheet('<div class="sheet-title">Impor playlist</div><label>Tempel link Spotify atau Apple Music</label><input type="text" id="auUrl" placeholder="https://open.spotify.com/playlist/...">' +
+        '<div id="auImpSt" class="queue-note" style="margin-top:12px">Playlist harus publik. Spotify dibaca sampai 100 lagu pertama. Daily Mix dan playlist buatan Spotify tidak bisa dibaca.</div>' +
+        '<div class="au-pg" id="auPg" style="display:none"><i></i></div>' +
+        '<div class="au-row" style="margin-top:16px"><button class="au-btn ghost" id="auImpPaste">Tempel</button><button class="au-btn" id="auImpGo">Impor</button></div>');
+    const inp = $('#auUrl', o), st = $('#auImpSt', o), pg = $('#auPg', o), go = $('#auImpGo', o);
+    $('#auImpPaste', o).onclick = async () => { try { inp.value = spUrl(await navigator.clipboard.readText()); } catch (e) { st.textContent = 'Clipboard tidak bisa dibaca. Tempel manual di kolom.'; } };
+    go.onclick = async () => {
+        const url = spUrl(inp.value); if (!url || go.disabled) return;
+        go.disabled = true; st.textContent = 'Membaca playlist...';
         try {
             const j = await (await fetch('/api/import?url=' + encodeURIComponent(url))).json();
-            if (j.status !== 'success') { st.textContent = j.message || 'Gagal membaca link.'; return; }
-            const list = j.data.tracks, res = [];
-            let i = 0, done = 0;
+            if (j.status !== 'success') { st.textContent = j.message || 'Gagal membaca link.'; go.disabled = false; return; }
+            const list = j.data.tracks, res = []; let i = 0, done = 0; pg.style.display = 'block';
             const worker = async () => {
                 while (i < list.length) {
-                    const it = list[i++];
-                    try { const r = await (await fetch('/api/search?query=' + encodeURIComponent(it.title + ' ' + it.artist))).json(); if (r.status === 'success' && r.data[0]) { const m = r.data[0]; res[list.indexOf(it)] = { videoId: m.videoId, title: m.title, artist: m.artist, img: getHighResImage(m.thumbnail) }; } } catch (e) {}
-                    st.textContent = 'Mencocokkan lagu ' + (++done) + '/' + list.length + '...';
+                    const idx = i++, it = list[idx];
+                    try { const r = await (await fetch('/api/search?query=' + encodeURIComponent(it.title + ' ' + it.artist))).json(); if (r.status === 'success' && r.data[0]) { const m = r.data[0]; res[idx] = { videoId: m.videoId, title: m.title, artist: m.artist, img: getHighResImage(m.thumbnail) }; } } catch (e) {}
+                    done++; st.textContent = 'Mencocokkan lagu ' + done + '/' + list.length + '...'; $('i', pg).style.width = Math.round(done / list.length * 100) + '%';
                 }
             };
             await Promise.all([worker(), worker(), worker(), worker()]);
-            const tracks = res.filter(Boolean);
-            if (!tracks.length) { st.textContent = 'Tidak ada lagu yang cocok ditemukan.'; return; }
+            const seen = new Set(), tracks = res.filter(t => t && !seen.has(t.videoId) && seen.add(t.videoId));
+            if (!tracks.length) { st.textContent = 'Tidak ada lagu yang cocok ditemukan.'; go.disabled = false; return; }
             const tx = db.transaction('playlists', 'readwrite');
             tx.objectStore('playlists').put({ id: Date.now().toString(), name: j.data.name, img: j.data.img || tracks[0].img, tracks: tracks });
-            tx.oncomplete = () => { closeSheet(); renderLibraryUI(); showToast('Diimpor: ' + tracks.length + ' dari ' + list.length + ' lagu'); };
-        } catch (e) { st.textContent = 'Gagal impor. Periksa koneksi atau link.'; }
+            tx.oncomplete = () => { closeSheet(); renderLibraryUI(); showToast('Diimpor: ' + tracks.length + ' dari ' + list.length + ' lagu' + (j.data.truncated ? ' (Spotify hanya memberi 100 lagu pertama)' : '')); };
+        } catch (e) { st.textContent = 'Gagal impor. Periksa koneksi atau link.'; go.disabled = false; }
     };
+    setTimeout(() => inp.focus(), 50);
 }
 
 /* ---------- Statistik & Recap ---------- */
@@ -418,6 +428,8 @@ function initStats() {
     $('#auImpBtn').onclick = importSheet;
     $('#libraryContainer').insertAdjacentElement('beforebegin', el('<div class="au-card" id="auStatCard" style="margin-top:12px"><div>Statistik & Recap<small>Rangkuman dengar musikmu</small></div><span style="font-size:26px">›</span></div>'));
     $('#auStatCard').onclick = () => { switchView('stats'); renderStats(); };
+    $('#auStatCard').insertAdjacentElement('beforebegin', el('<div class="au-card" id="auImpCard" style="margin-top:12px"><div>Impor playlist<small>Dari Spotify atau Apple Music</small></div><span style="font-size:26px">+</span></div>'));
+    $('#auImpCard').onclick = importSheet;
 }
 const AR = el('<div class="au-rc" id="auRc"><div class="rc-bars"></div><div class="rc-stage"></div><div class="rc-foot"><button class="au-btn" id="rcPoster">Poster</button><button class="au-btn ghost" id="rcClose">Tutup</button></div></div>');
 let rcI = 0, rcS = [], rcT, rcA, rcL;

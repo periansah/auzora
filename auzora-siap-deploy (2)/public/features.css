@@ -112,3 +112,5 @@ body.nav-collapsed .mini-player{left:calc(var(--sb) + 40px);bottom:calc(16px + e
 body.nav-collapsed .mini-player-controls svg:first-child{display:block}
 body::after{height:120px}
 }
+
+.au-pg{height:6px;border-radius:3px;background:rgba(255,255,255,.15);margin-top:12px;overflow:hidden}.au-pg i{display:block;height:100%;width:0;background:#1ed760;transition:width .2s}
