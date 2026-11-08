@@ -516,6 +516,41 @@ document.addEventListener('click', e => { if (e.target.closest('#playlistTracksC
 setInterval(() => { syncPlaylistBtn(); guardResume(); }, 700);
 setInterval(syncLyrics, 250);
 
+/* ---------- Sampul gaya Liquid Glass untuk layar kunci / notifikasi media (v3.3.3) ---------- */
+// Kartu pemutar di layar kunci digambar oleh Android, jadi gayanya tidak bisa diubah dari web.
+// Yang bisa: gambar sampulnya. Di sini sampul dibuat ulang bergaya kaca (latar blur + bingkai kaca + kilau).
+let glassUrl = '', glassSeq = 0;
+async function glassArt(url) {
+    const img = await loadImg(url); if (!img) return null;       // gagal (mis. CORS) -> pakai sampul asli
+    const S = 512, c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d');
+    const cover = (w, h) => { const r = Math.max(w / img.width, h / img.height), iw = img.width * r, ih = img.height * r; return [(w - iw) / 2, (h - ih) / 2, iw, ih]; };
+    x.save(); x.filter = 'blur(26px) saturate(1.7) brightness(1.05)'; x.drawImage(img, ...[].concat(cover(S, S).map((v, i) => i < 2 ? v - 40 : v + 80))); x.restore();
+    let g = x.createLinearGradient(0, 0, S, S); g.addColorStop(0, 'rgba(255,255,255,.34)'); g.addColorStop(.5, 'rgba(255,255,255,.06)'); g.addColorStop(1, 'rgba(255,255,255,.2)');
+    x.fillStyle = g; x.fillRect(0, 0, S, S);
+    const a = 64, w = S - a * 2, r = 88;
+    x.save(); x.shadowColor = 'rgba(0,0,0,.38)'; x.shadowBlur = 36; x.shadowOffsetY = 14; rr(x, a, a, w, w, r); x.fillStyle = 'rgba(255,255,255,.2)'; x.fill(); x.restore();
+    x.save(); rr(x, a, a, w, w, r); x.clip(); x.drawImage(img, ...cover(w, w).map((v, i) => i < 2 ? v + a : v)); x.restore();
+    x.save(); rr(x, a, a, w, w, r); x.clip();
+    g = x.createLinearGradient(a, a, a + w, a + w); g.addColorStop(0, 'rgba(255,255,255,.45)'); g.addColorStop(.35, 'rgba(255,255,255,0)'); g.addColorStop(.8, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(255,255,255,.22)');
+    x.fillStyle = g; x.fillRect(a, a, w, w);
+    x.beginPath(); x.ellipse(S / 2, a - 40, w * .62, 120, 0, 0, Math.PI * 2); x.fillStyle = 'rgba(255,255,255,.2)'; x.fill(); x.restore();
+    rr(x, a, a, w, w, r); x.lineWidth = 4; g = x.createLinearGradient(a, a, a + w, a + w); g.addColorStop(0, 'rgba(255,255,255,.95)'); g.addColorStop(.5, 'rgba(255,255,255,.25)'); g.addColorStop(1, 'rgba(255,255,255,.7)'); x.strokeStyle = g; x.stroke();
+    return new Promise(res => c.toBlob(b => res(b), 'image/png'));
+}
+const _ums = window.updateMediaSession;
+window.updateMediaSession = function () {
+    _ums.apply(this, arguments);
+    if (pref.get('auGlassArt', '1') !== '1' || !currentTrack || !currentTrack.img || !navigator.mediaSession) return;
+    const seq = ++glassSeq, t = currentTrack;
+    glassArt(t.img).then(blob => {
+        if (!blob || seq !== glassSeq || currentTrack !== t) return;
+        const old = glassUrl; glassUrl = URL.createObjectURL(blob);
+        const m = navigator.mediaSession.metadata; if (!m) return;
+        navigator.mediaSession.metadata = new MediaMetadata({ title: m.title, artist: m.artist, album: m.album, artwork: [{ src: glassUrl, sizes: '512x512', type: 'image/png' }] });
+        if (old) setTimeout(() => URL.revokeObjectURL(old), 5000);
+    }).catch(() => {});
+};
+
 /* ---------- init ---------- */
 function init() {
     document.body.append(I, W, AMB, AR); applyIsl();

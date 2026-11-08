@@ -69,3 +69,5 @@ Untuk frontend + API sekaligus seperti di Vercel, paling mudah pakai `vercel dev
 - **Terjemahan tetap tersinkron** (terjemahan tampil per baris di bawah teks asli); "Tampilkan asli" kini mengembalikan lirik tersinkron.
 - Backend: pencarian LRCLIB lebih akurat (pencocokan persis + judul dibersihkan dari "(Official Video)" dkk, toleransi durasi bertahap, dukungan banyak cap waktu per baris).
 - Lagu tanpa lirik tersinkron tetap menampilkan lirik biasa. Lagu Audius belum punya lirik.
+- **Sampul Liquid Glass di layar kunci**: kartu media Android digambar oleh sistem (tidak bisa di-style dari web), jadi yang diubah adalah gambar sampulnya: latar blur, bingkai kaca, kilau. Matikan dengan `localStorage.auGlassArt = '0'`. Bila gambar tidak bisa dibaca (CORS), sampul asli dipakai.
+- **Tata letak beda untuk HP dan web**: layar lebar dengan mouse (≥ 900 px) → navigasi jadi **sidebar kiri** vertikal dan mini player jadi **bar lebar di bawah** (di sebelah kanan sidebar). HP tetap kapsul navigasi di bawah. Geser-untuk-pindah-halaman dimatikan di desktop.

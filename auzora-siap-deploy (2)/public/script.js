@@ -1075,12 +1075,13 @@ function closeSleepMenu() { document.getElementById('sleepModal').style.display 
 // --- 11. NAVBAR KACA: geser untuk pindah halaman + melipat saat scroll ---
 const navEl = document.querySelector('.bottom-nav');
 const NAV_ORDER = ['home', 'search', 'library', 'developer'];
+const DESK = window.matchMedia('(min-width: 900px) and (pointer: fine)');   // tata letak desktop: sidebar kiri
 let navCollapsed = false, navDragging = false, navMoved = false, navStartX = 0, navSuppressClick = false;
 
 function collapseSupported() { return !!(window.IKI_ENV && IKI_ENV.android && IKI_ENV.ver >= 13); }
 function collapseEnabled() { return collapseSupported() && pref.get('ikiCollapse', '1') !== '0'; }
 function setNavCollapsed(v) {
-    if (v && !collapseEnabled()) return;
+    if (v && (DESK.matches || !collapseEnabled())) return;
     if (navCollapsed === v) return;
     navCollapsed = v;
     navEl.classList.toggle('collapsed', v);
@@ -1092,7 +1093,7 @@ function navIdxFromX(x) {
     return Math.min(3, Math.max(0, (x - r.left - 6) / w - 0.5));
 }
 navEl.addEventListener('pointerdown', (e) => {
-    if (navCollapsed) return;
+    if (navCollapsed || DESK.matches) return;
     navDragging = true; navMoved = false; navStartX = e.clientX;
 });
 window.addEventListener('pointermove', (e) => {
