@@ -1,4 +1,4 @@
-/* Auralys v3.3.0 — fitur baru. Dimuat setelah script.js (memakai fungsi & variabel globalnya). */
+/* Auralys v3.3.3 (dasar v3.3.0) — fitur baru. Dimuat setelah script.js (memakai fungsi & variabel globalnya). */
 (function () {
 'use strict';
 const $ = (s, r) => (r || document).querySelector(s), $$ = (s, r) => [...(r || document).querySelectorAll(s)];
@@ -236,23 +236,62 @@ try { navigator.mediaSession.setActionHandler('enterpictureinpicture', () => sma
 /* ---------- Terjemahan lirik (Google gratis / DeepL via backend) ---------- */
 const LANGS = [['id', 'Indonesia'], ['en', 'Inggris'], ['ja', 'Jepang'], ['ko', 'Korea'], ['es', 'Spanyol'], ['fr', 'Prancis'], ['de', 'Jerman'], ['ar', 'Arab'], ['zh-CN', 'Mandarin'], ['pt', 'Portugis'], ['ru', 'Rusia'], ['hi', 'Hindi'], ['th', 'Thai'], ['ms', 'Melayu']];
 const phoneLang = (() => { const l = (navigator.language || 'id').split('-')[0].toLowerCase(); if (l === 'zh') return 'zh-CN'; return LANGS.some(x => x[0] === l) ? l : 'id'; })();
-let lyrText = '', synced = null, syncIdx = -1;
+let lyrText = '', synced = null, syncIdx = -1, lyrLines = [], lastUser = 0, offKey = '';
+const getOff = () => parseFloat(pref.get(offKey, '0')) || 0;
+function updSyncBar() {
+    const bar = $('#auSyncBar'); if (!bar) return;
+    bar.style.display = synced ? 'flex' : 'none';
+    const o = getOff(); const v = $('#auSyncVal'); if (v) v.textContent = (o > 0 ? '+' : '') + o.toFixed(1) + 's';
+}
+function renderSynced(tr) {       // tr: {indeks: terjemahan} (opsional)
+    lyricsBody.textContent = ''; lyricsBody.classList.add('synced');
+    synced.forEach((r, i) => {
+        const d = el('<div class="lyr-line"></div>'), sp = document.createElement('span');
+        sp.textContent = r[1] || '♪'; d.appendChild(sp); d.dataset.i = i;
+        if (tr && tr[i]) { const t = el('<div class="lyr-t"></div>'); t.textContent = tr[i]; d.appendChild(t); }
+        lyricsBody.appendChild(d);
+    });
+    lyrLines = $$('.lyr-line', lyricsBody);
+    const s = el('<span class="lyrics-source"></span>'); s.textContent = 'LRCLIB • tersinkron — ketuk baris untuk loncat'; lyricsBody.appendChild(s);
+    syncIdx = -2; syncLyrics(true);
+}
 const _ol = window.openLyrics;
-window.openLyrics = async function () {
-    lyrText = ''; synced = null; syncIdx = -1; window._lyrData = null; await _ol.apply(this, arguments);
+window.openLyrics = async function (t) {
+    lyrText = ''; synced = null; syncIdx = -1; lyrLines = []; lyricsBody.classList.remove('synced'); window._lyrData = null; offKey = 'auLo:' + (t && t.videoId); updSyncBar();
+    await _ol.apply(this, arguments);
     const D = window._lyrData, ok = !lyricsBody.querySelector('.lyrics-msg');
-    if (ok && D && D.synced && D.synced.length) {
-        synced = D.synced; lyrText = D.lyrics || ''; lyricsBody.textContent = '';
-        D.synced.forEach(r => { const d = el('<div class="lyr-line"></div>'); d.textContent = r[1] || '♪'; d.dataset.t = r[0]; lyricsBody.appendChild(d); });
-        if (D.source) { const s = el('<span class="lyrics-source"></span>'); s.textContent = D.source; lyricsBody.appendChild(s); }
-    } else if (ok && lyricsBody.firstChild) lyrText = lyricsBody.firstChild.textContent || '';
+    if (ok && D && D.synced && D.synced.length) { synced = D.synced; lyrText = D.lyrics || ''; renderSynced(); }
+    else if (ok && lyricsBody.firstChild) lyrText = lyricsBody.firstChild.textContent || '';
+    updSyncBar();
 };
-function syncLyrics() {
+function centerLine(e, smooth) {
+    const br = lyricsBody.getBoundingClientRect(), lr = e.getBoundingClientRect();
+    lyricsBody.scrollBy({ top: lr.top - br.top - (br.height / 2 - lr.height / 2), behavior: smooth ? 'smooth' : 'auto' });
+}
+function syncLyrics(force) {
     if (!synced || lyricsModal.style.display !== 'flex' || !currentTrack || !lyricsTrack || currentTrack.videoId !== lyricsTrack.videoId) return;
-    const c = getCur() + .3; let i = -1; for (let k = 0; k < synced.length; k++) { if (synced[k][0] <= c) i = k; else break; }
-    if (i === syncIdx) return; syncIdx = i;
-    const ls = $$('.lyr-line', lyricsBody); ls.forEach((e, k) => e.classList.toggle('on', k === i));
-    if (ls[i]) ls[i].scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const c = getCur() + .25 + getOff();
+    let lo = 0, hi = synced.length - 1, i = -1;           // pencarian biner: baris terakhir yang waktunya <= posisi lagu
+    while (lo <= hi) { const m = (lo + hi) >> 1; if (synced[m][0] <= c) { i = m; lo = m + 1; } else hi = m - 1; }
+    if (i === syncIdx && !force) {
+        if (lastUser && Date.now() - lastUser > 4000) { lastUser = 0; if (lyrLines[i]) centerLine(lyrLines[i], true); }   // kembali mengikuti setelah pengguna berhenti menggulir
+        return;
+    }
+    const jump = Math.abs(i - syncIdx) > 1; syncIdx = i;
+    lyrLines.forEach((e, k) => { e.classList.toggle('on', k === i); e.classList.toggle('past', k < i); });
+    if (lyrLines[i] && (!lastUser || Date.now() - lastUser > 4000 || force)) { lastUser = 0; centerLine(lyrLines[i], !jump || !force); }
+}
+lyricsBody.addEventListener('click', e => {
+    const l = e.target.closest('.lyr-line'); if (!l || !synced) return;
+    if (!currentTrack || currentTrack.videoId !== lyricsTrack.videoId) { showToast('Putar lagu ini dulu untuk loncat ke baris lirik.'); return; }
+    doSeek(Math.max(0, synced[+l.dataset.i][0] - getOff())); lastUser = 0; syncLyrics(true);
+});
+['touchstart', 'wheel', 'pointerdown'].forEach(ev => lyricsBody.addEventListener(ev, () => { lastUser = Date.now(); }, { passive: true }));
+async function trSynced(tl) {      // terjemahkan per baris supaya tetap tersinkron
+    const ne = []; synced.forEach((r, i) => { if ((r[1] || '').trim()) ne.push(i); });
+    const out = (await translateText(ne.map(i => synced[i][1]).join('\n'), tl)).split('\n');
+    if (out.length !== ne.length) return false;
+    const m = {}; ne.forEach((i, k) => { m[i] = out[k]; }); renderSynced(m); return true;
 }
 async function googleTr(text, tl) {
     const lines = text.split('\n'), chunks = []; let c = '';
@@ -282,9 +321,9 @@ function trSheet() {
         '<label>Penerjemah: ' + (pref.get('auTp', 'google') === 'deepl' ? 'DeepL' : 'Google Terjemahan (gratis)') + ' — ubah di Developer › Tampilan</label><div class="au-row" style="margin-top:16px"><button class="au-btn" id="auDoTr">Terjemahkan</button><button class="au-btn ghost" id="auUnTr">Tampilkan asli</button></div>');
     $('#auDoTr', o).onclick = async () => {
         const tl = $('#auTl', o).value; pref.set('auTl', tl); closeSheet(); showToast('Menerjemahkan...');
-        try { showTranslation(lyrText, await translateText(lyrText, tl)); } catch (e) { showToast('Gagal menerjemahkan: ' + (e.message || 'periksa koneksi')); }
+        try { if (synced && await trSynced(tl)) return; showTranslation(lyrText, await translateText(lyrText, tl)); } catch (e) { showToast('Gagal menerjemahkan: ' + (e.message || 'periksa koneksi')); }
     };
-    $('#auUnTr', o).onclick = () => { closeSheet(); _ol(lyricsTrack, lyricsFollowsPlayer); };
+    $('#auUnTr', o).onclick = () => { closeSheet(); window.openLyrics(lyricsTrack, lyricsFollowsPlayer); };
 }
 
 /* ---------- Bagikan lirik sebagai gambar ---------- */
@@ -474,7 +513,8 @@ function guardResume() {
     if (paused) { resumeTry++; doPlay(); }
 }
 document.addEventListener('click', e => { if (e.target.closest('#playlistTracksContainer .v-item') && !e.target.closest('.dots-icon')) ctx = { tracks: (currentPlaylistTracks || []).slice() }; }, true);
-setInterval(() => { syncLyrics(); syncPlaylistBtn(); guardResume(); }, 700);
+setInterval(() => { syncPlaylistBtn(); guardResume(); }, 700);
+setInterval(syncLyrics, 250);
 
 /* ---------- init ---------- */
 function init() {
@@ -485,6 +525,13 @@ function init() {
     if (cap) cap.insertAdjacentHTML('beforeend', '<button data-au="amb2"><svg viewBox="0 0 24 24"><path d="M12 7a5 5 0 100 10 5 5 0 000-10zM2 13h2v-2H2v2zm18 0h2v-2h-2v2zM11 2v2h2V2h-2zm0 18v2h2v-2h-2z"/></svg><span>Ambient</span></button><button data-au="pip2"><svg viewBox="0 0 24 24"><path d="M19 7h-8v6h8V7zm2-4H3c-1.1 0-2 .9-2 2v14c0 1.1.9 1.98 2 1.98h18c1.1 0 2-.88 2-1.98V5c0-1.1-.9-2-2-2zm0 16.01H3V4.98h18v14.03z"/></svg><span>Melayang</span></button>');
     const hd = $('#lyricsModal .lyric-actions');
     if (hd) hd.insertAdjacentHTML('afterbegin', '<svg class="lyric-btn" id="auTrBtn" viewBox="0 0 24 24"><path d="M12.87 15.07l-2.54-2.51.03-.03A17.52 17.52 0 0014.07 6H17V4h-7V2H8v2H1v1.99h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg><svg class="lyric-btn" id="auImgBtn" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>');
+    const lb = $('#lyricsBody');
+    if (lb && !$('#auSyncBar')) {
+        lb.insertAdjacentHTML('beforebegin', '<div id="auSyncBar" class="au-syncbar" style="display:none"><span class="au-sb-dot">● Tersinkron</span><span class="au-sb-sp"></span><button id="auSyncM" aria-label="Lirik lebih lambat">Lambat</button><b id="auSyncVal" title="Ketuk untuk reset">0.0s</b><button id="auSyncP" aria-label="Lirik lebih cepat">Cepat</button></div>');
+        const ch = d => { pref.set(offKey, (Math.round((getOff() + d) * 10) / 10).toFixed(1)); updSyncBar(); syncLyrics(true); };
+        $('#auSyncM').onclick = () => ch(-.5); $('#auSyncP').onclick = () => ch(.5);
+        $('#auSyncVal').onclick = () => { pref.set(offKey, '0'); updSyncBar(); syncLyrics(true); };
+    }
     if ($('#auTrBtn')) { $('#auTrBtn').onclick = trSheet; $('#auImgBtn').onclick = lyrImgSheet; }
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();

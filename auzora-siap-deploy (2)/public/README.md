@@ -60,3 +60,12 @@ Untuk frontend + API sekaligus seperti di Vercel, paling mudah pakai `vercel dev
 - Tombol putar playlist ⇄ jeda; setelah playlist habis lanjut rekomendasi dari lagu terakhir.
 - Lirik: dipilih yang tersinkron (LRCLIB) dan durasinya cocok; baris aktif ikut menyorot. Bahasa terjemahan default mengikuti bahasa HP.
 - Lagu yang terjeda sendiri karena gangguan suara dilanjutkan otomatis (maks. 3 kali), kecuali pengguna yang menjeda.
+
+## v3.3.3 — Lirik Sinkron (Time-Synced Lyrics)
+- Lirik berjalan otomatis: baris aktif disorot & dibesarkan, baris yang sudah lewat diredupkan, layar menggulir ke tengah (cek tiap 250 ms, pencarian biner).
+- **Ketuk baris lirik** untuk loncat ke bagian itu di lagu.
+- **Offset sinkron** (Lambat / Cepat, ±0,5 dtk, tersimpan per lagu) bila lirik terasa sedikit meleset; ketuk angka untuk reset.
+- Menggulir manual menjeda auto-scroll 4 detik, lalu kembali mengikuti.
+- **Terjemahan tetap tersinkron** (terjemahan tampil per baris di bawah teks asli); "Tampilkan asli" kini mengembalikan lirik tersinkron.
+- Backend: pencarian LRCLIB lebih akurat (pencocokan persis + judul dibersihkan dari "(Official Video)" dkk, toleransi durasi bertahap, dukungan banyak cap waktu per baris).
+- Lagu tanpa lirik tersinkron tetap menampilkan lirik biasa. Lagu Audius belum punya lirik.

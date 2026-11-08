@@ -82,7 +82,15 @@
 body::after{content:'';position:fixed;left:0;right:0;bottom:0;height:calc(176px + env(safe-area-inset-bottom,0px));background:linear-gradient(to top,var(--bg-base) 58%,rgba(18,18,18,0));pointer-events:none;z-index:800}
 .search-box{padding:9px 12px 9px 38px;font-size:14px;border-radius:8px}
 .search-icon-input{top:8px;left:10px;width:20px;height:20px}
-.lyr-line{font-size:24px;font-weight:800;margin-top:14px;opacity:.4;transition:opacity .3s}.lyr-line.on{opacity:1}
+/* v3.3.3 lirik sinkron */
+.lyr-line{font-size:24px;font-weight:800;margin-top:14px;opacity:.32;transform-origin:left center;cursor:pointer;transition:opacity .35s,transform .35s;-webkit-tap-highlight-color:transparent}
+.lyr-line.past{opacity:.5}.lyr-line.on{opacity:1;transform:scale(1.05)}
+.lyr-line .lyr-t{font-size:15px;font-weight:500;opacity:.8}
+.au-syncbar{display:flex;align-items:center;gap:8px;padding:0 24px 8px;font-size:12px;color:rgba(255,255,255,.75);position:relative;z-index:3}
+.au-syncbar .au-sb-sp{flex:1}.au-sb-dot{color:#1ed760;font-weight:700}
+.au-syncbar button{border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.12);color:#fff;border-radius:999px;padding:5px 11px;font-size:12px;font-weight:600}
+.au-syncbar b{min-width:44px;text-align:center;font-weight:700;color:#fff;cursor:pointer}
+.lyrics-body.synced{padding-top:30vh;padding-bottom:40vh}
 html[data-view="developer"].lens .bottom-nav,html[data-view="developer"].lens .mini-player,html[data-view="developer"].lens .glass-capsule{-webkit-backdrop-filter:blur(14px) saturate(160%);backdrop-filter:blur(14px) saturate(160%)}
 html[data-view="developer"] .dev-card{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(32,34,46,.9)}
 html[data-view="developer"] .blob{animation-play-state:paused}
