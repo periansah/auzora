@@ -92,26 +92,70 @@ def get_home_data(response: Response):
         return error(str(e))
 
 
+def _clean_title(t: str) -> str:
+    """Buang embel-embel seperti (Official Video), [Lyrics], - Remastered agar pencarian lirik lebih tepat."""
+    t = re.sub(r"[\(\[][^\)\]]*(official|video|audio|lyric|lirik|mv|clip|remaster|live|visuali[sz]er|ost)[^\)\]]*[\)\]]", "", t, flags=re.I)
+    t = re.sub(r"\s*[-|]\s*(official.*|lyrics?.*|lirik.*|remaster.*)$", "", t, flags=re.I)
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def _parse_lrc(text: str):
+    """Parse LRC -> [[detik, teks], ...]. Mendukung beberapa cap waktu dalam satu baris."""
+    out = []
+    for ln in (text or "").splitlines():
+        stamps = re.findall(r"\[(\d+):(\d+(?:\.\d+)?)\]", ln)
+        if not stamps:
+            continue
+        body = re.sub(r"\[\d+:\d+(?:\.\d+)?\]", "", ln).strip()
+        for mm, ss in stamps:
+            out.append([round(int(mm) * 60 + float(ss), 2), body])
+    out.sort(key=lambda x: x[0])
+    return out
+
+
 def _lrclib(title: str, artist: str, duration: int):
-    """Cari lirik tersinkron (LRC) yang durasinya cocok dengan lagu (toleransi 4 detik)."""
-    items = json.loads(_fetch("https://lrclib.net/api/search?" + urlencode({"track_name": title, "artist_name": artist})))
+    """Cari lirik tersinkron (LRC) di LRCLIB. Urutan: pencocokan persis -> pencarian terstruktur -> pencarian bebas."""
+    ct = _clean_title(title)
+    cands = []
+
+    def add(items):
+        if isinstance(items, dict):
+            items = [items]
+        for it in items or []:
+            if isinstance(it, dict) and it.get("syncedLyrics") and not it.get("instrumental"):
+                cands.append(it)
+
+    if duration:  # pencocokan persis (paling akurat)
+        try:
+            add(json.loads(_fetch("https://lrclib.net/api/get?" + urlencode(
+                {"track_name": ct, "artist_name": artist, "duration": duration}))))
+        except Exception:
+            pass
+    queries = [{"track_name": ct, "artist_name": artist}, {"q": (ct + " " + artist).strip()}]
+    if ct != title:
+        queries.insert(1, {"track_name": title, "artist_name": artist})
+    for q in queries:
+        if len(cands) >= 5:
+            break
+        try:
+            add(json.loads(_fetch("https://lrclib.net/api/search?" + urlencode(q))))
+        except Exception:
+            continue
+
     best = None
-    for it in items:
-        if not it.get("syncedLyrics"):
-            continue
-        d = it.get("duration") or 0
-        if duration and abs(d - duration) > 4:
-            continue
-        score = abs(d - duration) if duration else 0
-        if best is None or score < best[0]:
-            best = (score, it)
+    for tol in ((4, 8) if duration else (None,)):   # coba toleransi ketat dulu, lalu longgar
+        for it in cands:
+            d = it.get("duration") or 0
+            if tol is not None and abs(d - duration) > tol:
+                continue
+            score = abs(d - duration) if duration else 0
+            if best is None or score < best[0]:
+                best = (score, it)
+        if best:
+            break
     if not best:
         return None
-    synced = []
-    for ln in best[1]["syncedLyrics"].splitlines():
-        m = re.match(r"\[(\d+):(\d+(?:\.\d+)?)\]\s*(.*)", ln)
-        if m:
-            synced.append([round(int(m.group(1)) * 60 + float(m.group(2)), 2), m.group(3)])
+    synced = _parse_lrc(best[1]["syncedLyrics"])
     if not synced:
         return None
     return {"lyrics": "\n".join(t for _, t in synced), "synced": synced, "source": "LRCLIB • tersinkron"}
