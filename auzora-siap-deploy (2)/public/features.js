@@ -112,26 +112,70 @@ function islSheet() {
     const rng = (k, l, a, b) => '<label>' + l + '</label><input type="range" data-r="' + k + '" min="' + a + '" max="' + b + '" value="' + isl[k] + '">';
     const o = sheet('<div class="sheet-title">Dynamic Island</div><label>Preset</label><div class="au-row" data-p>' + Object.keys(PRESETS).map(n => '<div class="pill">' + n + '</div>').join('') + '</div>' +
         '<label>Gaya</label>' + pills('style', [['black', 'Hitam'], ['glass', 'Kaca'], ['cover', 'Warna cover']], isl.style) + '<label>Posisi</label>' + pills('pos', [['left', 'Kiri'], ['center', 'Tengah'], ['right', 'Kanan']], isl.pos) +
-        rng('radius', 'Sudut', 8, 40) + rng('glow', 'Cahaya', 0, 100) + rng('size', 'Ukuran', 80, 120) + rng('y', 'Jarak dari atas', 0, 60) + '<div style="margin-top:16px"><button class="au-btn" data-done>Selesai</button></div>', true);
+        rng('radius', 'Sudut', 8, 40) + rng('glow', 'Cahaya', 0, 100) + rng('size', 'Ukuran', 80, 120) + rng('y', 'Jarak dari atas', 0, 60) + '<div class="au-row" style="margin-top:16px"><button class="au-btn ghost" data-pip>Kapsul melayang (PiP)</button><button class="au-btn" data-done>Selesai</button></div>', true);
     const done = () => { previewing = false; closeSheet(); };
     o.addEventListener('click', e => { if (e.target === o) previewing = false; });
     o.onclick = e => {
         const t = e.target;
         if (t === o) { done(); return; }
         if (t.dataset.done !== undefined) done();
+        else if (t.dataset.pip !== undefined) smartPip(true);
         else if (t.parentNode.dataset.p !== undefined) { Object.assign(isl, PRESETS[t.textContent]); saveIsl(); islSheet(); }
         else if (t.dataset.v !== undefined) { isl[t.parentNode.dataset.f] = t.dataset.v; saveIsl(); $$('.pill', t.parentNode).forEach(p => p.classList.toggle('sel', p === t)); }
     };
     o.oninput = e => { if (e.target.dataset.r) { isl[e.target.dataset.r] = +e.target.value; saveIsl(); } };
 }
-function openPip() {   // Chrome desktop: kapsul ikut melayang saat pindah tab (Document Picture-in-Picture)
-    if (!isl.on || !window.documentPictureInPicture || pip) return;
+function openPip(force) {   // Chrome desktop: kapsul ikut melayang saat pindah tab (Document Picture-in-Picture)
+    if ((!isl.on && !force) || !window.documentPictureInPicture || pip) return;
     documentPictureInPicture.requestWindow({ width: 360, height: 130 }).then(w => {
         $$('link[rel=stylesheet]').forEach(l => w.document.head.appendChild(l.cloneNode()));
         w.document.body.style.cssText = 'margin:0;background:#000;overflow:hidden'; pip = true; I.classList.add('pip', 'open', 'show'); w.document.body.appendChild(I);
         w.addEventListener('pagehide', () => { pip = false; I.classList.remove('pip'); document.body.appendChild(I); });
         w.document.addEventListener('click', e => { const b = e.target.closest('[data-au]'); if (b && b.dataset.au !== 'tog') act(b.dataset.au); });
     }).catch(() => {});
+}
+
+
+/* ---------- Kapsul melayang lewat Picture-in-Picture video (Android & browser tanpa Document PiP) ---------- */
+const PV = document.createElement('video'), PC = document.createElement('canvas');
+PC.width = 480; PC.height = 200; PV.muted = true; PV.playsInline = true;
+PV.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;opacity:.01;pointer-events:none';
+let pImg = null, pImgSrc = '', pTimer;
+async function drawPip() {
+    const T = currentTrack, x = PC.getContext('2d'); if (!T) return;
+    if (T.img !== pImgSrc) { pImgSrc = T.img; pImg = null; loadImg(T.img).then(i => { if (pImgSrc === T.img) pImg = i; }); }
+    x.fillStyle = '#0b0b0f'; x.fillRect(0, 0, 480, 200);
+    x.fillStyle = 'rgba(30,215,96,.18)'; x.fillRect(0, 0, 480, 200);
+    x.fillStyle = '#0b0b0f'; rr(x, 6, 6, 468, 188, 40); x.fill();
+    if (pImg) { x.save(); rr(x, 28, 28, 108, 108, 20); x.clip(); x.drawImage(pImg, 28, 28, 108, 108); x.restore(); } else { x.fillStyle = '#282828'; rr(x, 28, 28, 108, 108, 20); x.fill(); }
+    const fit = (t, w) => { let o = t; while (x.measureText(o).width > w && o.length > 1) o = o.slice(0, -1); return o === t ? t : o + '…'; };
+    x.fillStyle = '#fff'; x.textBaseline = 'top'; x.font = '700 28px sans-serif'; x.fillText(fit(T.title, 250), 156, 36);
+    x.globalAlpha = .7; x.font = '400 21px sans-serif'; x.fillText(fit(T.artist, 250), 156, 76); x.globalAlpha = 1;
+    const t = Date.now() / 250;   // equalizer / ikon jeda
+    if (isPlaying) { x.fillStyle = '#1ed760'; for (let i = 0; i < 3; i++) { const h = 10 + Math.abs(Math.sin(t + i * 1.7)) * 26; x.fillRect(404 + i * 14, 66 - h, 8, h); } }
+    else { x.fillStyle = '#fff'; x.fillRect(408, 38, 9, 28); x.fillRect(426, 38, 9, 28); }
+    const d = getDur(), c = getCur(); x.fillStyle = 'rgba(255,255,255,.2)'; rr(x, 156, 124, 292, 10, 5); x.fill();
+    x.fillStyle = '#fff'; rr(x, 156, 124, Math.max(10, d ? 292 * Math.min(1, c / d) : 0), 10, 5); x.fill();
+    x.fillStyle = 'rgba(255,255,255,.55)'; x.font = '500 18px sans-serif'; x.fillText(formatTime(c), 156, 148); x.textAlign = 'right'; x.fillText(d ? formatTime(d) : '', 448, 148); x.textAlign = 'left';
+}
+PV.addEventListener('pause', () => { if (isPlaying && document.pictureInPictureElement === PV) togglePlay(); });
+PV.addEventListener('play', () => { if (!isPlaying && document.pictureInPictureElement === PV) togglePlay(); });
+async function openVidPip() {
+    if (!currentTrack) { showToast('Putar lagu dulu.'); return; }
+    try {
+        if (document.pictureInPictureElement) { await document.exitPictureInPicture(); return; }
+        if (!PV.isConnected) document.body.appendChild(PV);
+        await drawPip();
+        if (!PV.srcObject) PV.srcObject = PC.captureStream(10);
+        await PV.play(); await PV.requestPictureInPicture();
+        clearInterval(pTimer); pTimer = setInterval(drawPip, 500);
+        PV.addEventListener('leavepictureinpicture', () => { clearInterval(pTimer); PV.pause(); }, { once: true });
+    } catch (e) { showToast('Tidak bisa membuka jendela melayang di browser ini.'); }
+}
+function smartPip(force) {
+    if (window.documentPictureInPicture) openPip(force);
+    else if (document.pictureInPictureEnabled && (force || isl.on)) openVidPip();
+    else if (force) showToast('Browser ini tidak mendukung jendela melayang.');
 }
 
 /* ---------- Widget Auralys Glass ---------- */
@@ -152,7 +196,7 @@ function closeAmb() { AMB.classList.remove('show'); try { if (wake) wake.release
 /* ---------- aksi bersama (delegasi klik) ---------- */
 function act(a) {
     if (a === 'prev') playPrev(); else if (a === 'next') playNextSimilarSong(); else if (a === 'pp') togglePlay();
-    else if (a === 'open') { I.classList.remove('open'); expandPlayer(); } else if (a === 'closeAmb') closeAmb(); else if (a === 'amb2') openAmb();
+    else if (a === 'open') { I.classList.remove('open'); expandPlayer(); } else if (a === 'closeAmb') closeAmb(); else if (a === 'amb2') openAmb(); else if (a === 'pip2') smartPip(true);
     else if (a === 'tog') { I.classList.toggle('open'); clearTimeout(islTimer); if (I.classList.contains('open') && !pip) islTimer = setTimeout(() => I.classList.remove('open'), 6000); }
 }
 document.addEventListener('click', e => {
@@ -187,7 +231,7 @@ setInterval(() => {
 }, 1000);
 addEventListener('pagehide', savePlays);
 document.addEventListener('visibilitychange', () => { if (document.hidden) savePlays(); });
-try { navigator.mediaSession.setActionHandler('enterpictureinpicture', openPip); } catch (e) {}
+try { navigator.mediaSession.setActionHandler('enterpictureinpicture', () => smartPip(false)); } catch (e) {}
 
 /* ---------- Terjemahan lirik (Google gratis / DeepL via backend) ---------- */
 const LANGS = [['id', 'Indonesia'], ['en', 'Inggris'], ['ja', 'Jepang'], ['ko', 'Korea'], ['es', 'Spanyol'], ['fr', 'Prancis'], ['de', 'Jerman'], ['ar', 'Arab'], ['zh-CN', 'Mandarin'], ['pt', 'Portugis'], ['ru', 'Rusia'], ['hi', 'Hindi'], ['th', 'Thai'], ['ms', 'Melayu']];
@@ -387,7 +431,7 @@ function init() {
     const wp = pref.get('auWPos', ''); if (wp.includes('|')) { const p = wp.split('|'); W.style.left = p[0]; W.style.top = p[1]; W.style.right = 'auto'; }
     initSettingsCard(); initSearch(); initStats();
     const cap = $('#playerModal .glass-capsule');
-    if (cap) cap.insertAdjacentHTML('beforeend', '<button data-au="amb2"><svg viewBox="0 0 24 24"><path d="M12 7a5 5 0 100 10 5 5 0 000-10zM2 13h2v-2H2v2zm18 0h2v-2h-2v2zM11 2v2h2V2h-2zm0 18v2h2v-2h-2z"/></svg><span>Ambient</span></button>');
+    if (cap) cap.insertAdjacentHTML('beforeend', '<button data-au="amb2"><svg viewBox="0 0 24 24"><path d="M12 7a5 5 0 100 10 5 5 0 000-10zM2 13h2v-2H2v2zm18 0h2v-2h-2v2zM11 2v2h2V2h-2zm0 18v2h2v-2h-2z"/></svg><span>Ambient</span></button><button data-au="pip2"><svg viewBox="0 0 24 24"><path d="M19 7h-8v6h8V7zm2-4H3c-1.1 0-2 .9-2 2v14c0 1.1.9 1.98 2 1.98h18c1.1 0 2-.88 2-1.98V5c0-1.1-.9-2-2-2zm0 16.01H3V4.98h18v14.03z"/></svg><span>Melayang</span></button>');
     const hd = $('#lyricsModal .lyric-actions');
     if (hd) hd.insertAdjacentHTML('afterbegin', '<svg class="lyric-btn" id="auTrBtn" viewBox="0 0 24 24"><path d="M12.87 15.07l-2.54-2.51.03-.03A17.52 17.52 0 0014.07 6H17V4h-7V2H8v2H1v1.99h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg><svg class="lyric-btn" id="auImgBtn" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>');
     if ($('#auTrBtn')) { $('#auTrBtn').onclick = trSheet; $('#auImgBtn').onclick = lyrImgSheet; }
