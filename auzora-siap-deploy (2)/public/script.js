@@ -146,6 +146,7 @@ function onAutoplayBlocked() {
 
 function onPlayerReady(event) {
     console.log("YouTube Player is ready");
+    applyVolume();
 }
 
 function onPlayerStateChange(event) {
@@ -183,7 +184,8 @@ function onPlayerStateChange(event) {
         stopProgressBar();
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
         
-        playNextSimilarSong();
+        if (sleepAtEnd) { clearSleep(); showToast('Timer tidur: pemutaran dihentikan'); }
+        else playNextSimilarSong();
     }
     updateLyricsPlayIcon();
 }
@@ -333,7 +335,11 @@ function playMusic(videoId, encodedTrackData, fromHistory) {
         setTimeout(startKeepAlive, 400);
     }
     
+    applyVolume();
+    const qm = document.getElementById('queueModal'); if (qm) qm.style.display = 'none';
+
     document.getElementById('progressBar').value = 0;
+    document.getElementById('progressBar').style.setProperty('--p', '0%');
     document.getElementById('currentTime').innerText = "0:00";
     document.getElementById('totalTime').innerText = "0:00";
 
@@ -385,7 +391,7 @@ function startProgressBar() {
             const percent = (current / duration) * 100;
             const progressBar = document.getElementById('progressBar');
             progressBar.value = percent;
-            progressBar.style.background = `linear-gradient(to right, white ${percent}%, rgba(255,255,255,0.2) ${percent}%)`;
+            progressBar.style.setProperty('--p', percent + '%');
             document.getElementById('currentTime').innerText = formatTime(current);
             document.getElementById('totalTime').innerText = formatTime(duration);
             updatePositionState();
@@ -401,7 +407,7 @@ function seekTo(value) {
     const duration = getDur();
     if (duration <= 0) return;
     doSeek((value / 100) * duration);
-    document.getElementById('progressBar').style.background = `linear-gradient(to right, white ${value}%, rgba(255,255,255,0.2) ${value}%)`;
+    document.getElementById('progressBar').style.setProperty('--p', value + '%');
 }
 
 // --- CUSTOM TOAST NOTIFICATION ---
@@ -431,6 +437,7 @@ function switchView(viewName) {
     if (viewName === 'library') renderLibraryUI();
     
     window.scrollTo(0,0);
+    if (typeof setNavCollapsed === 'function') setNavCollapsed(false);
 }
 
 // --- 4. RENDER KOMPONEN UI ---
@@ -655,7 +662,7 @@ async function openArtistView(artistName) {
 function setLikeButton(btn, liked) {
     if (!btn) return;
     btn.classList.toggle('liked', liked);
-    if (btn.id === 'btnLikeSong') btn.style.fill = liked ? '#1ed760' : 'white';
+    if (btn.id === 'btnLikeSong') { btn.style.fill = liked ? '#1ed760' : 'white'; btn.style.color = liked ? '#1ed760' : 'white'; }
 }
 
 // Sinkronkan status like untuk lagu di player & lagu di modal lirik
@@ -976,7 +983,232 @@ function trackMenuAction(action) {
     else if (action === 'playlist') openAddToPlaylistModal(t);
 }
 
+// --- 9. VOLUME ---
+const pref = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, String(v)); } catch (e) {} }
+};
+let volume = Math.min(100, Math.max(0, parseInt(pref.get('ikiVol', '100'), 10) || 0));
+if (pref.get('ikiVol', null) === null) volume = 100;
+
+function applyVolume() {
+    try { audioEl.volume = volume / 100; } catch (e) {}
+    try { if (ytPlayer && ytPlayer.setVolume) ytPlayer.setVolume(volume); } catch (e) {}
+}
+function setVolume(v) {
+    volume = Math.min(100, Math.max(0, +v));
+    applyVolume();
+    const el = document.getElementById('volumeBar');
+    if (el) el.style.setProperty('--p', volume + '%');
+    pref.set('ikiVol', volume);
+}
+
+// --- 10. ANTREAN, BAGIKAN, TIMER TIDUR ---
+function openQueue() {
+    const label = t => `<div class="queue-label">${t}</div>`;
+    let h = '';
+    if (currentTrack) {
+        h += label('Sedang diputar') + createListHTML(currentTrack);
+        if (currentTrack.src === 'audius') {
+            if (audiusQueue.length) { h += label('Berikutnya'); audiusQueue.slice(0, 10).forEach(t => h += createListHTML(t)); }
+        } else {
+            h += label('Berikutnya') + '<div class="queue-note">Lagu berikutnya dipilih otomatis dari artis yang sama.</div>';
+        }
+    }
+    if (trackHistory.length) { h += label('Riwayat'); trackHistory.slice().reverse().forEach(t => h += createListHTML(t)); }
+    if (!h) h = '<div class="queue-note">Belum ada lagu yang diputar.</div>';
+    document.getElementById('queueBody').innerHTML = h;
+    document.getElementById('queueModal').style.display = 'flex';
+}
+function closeQueue() { document.getElementById('queueModal').style.display = 'none'; }
+
+async function shareCurrent() {
+    if (!currentTrack) { showToast('Putar lagu dulu untuk membagikan.'); return; }
+    const url = currentTrack.src === 'audius'
+        ? 'https://audius.co/search/' + encodeURIComponent(currentTrack.title)
+        : 'https://music.youtube.com/watch?v=' + encodeURIComponent(currentTrack.videoId);
+    const text = currentTrack.title + ' — ' + currentTrack.artist;
+    try {
+        if (navigator.share) { await navigator.share({ title: currentTrack.title, text: text, url: url }); return; }
+    } catch (e) { if (e && e.name === 'AbortError') return; }
+    try { await navigator.clipboard.writeText(text + '\n' + url); showToast('Tautan lagu disalin'); }
+    catch (e) { showToast('Tidak bisa membagikan lagu ini.'); }
+}
+
+let sleepTimer = null, sleepTick = null, sleepEndsAt = 0, sleepAtEnd = false;
+function updateSleepLabel() {
+    const el = document.getElementById('sleepLabel'), btn = document.getElementById('sleepBtn');
+    if (!el || !btn) return;
+    if (sleepAtEnd) el.textContent = 'Akhir lagu';
+    else if (sleepEndsAt) el.textContent = Math.max(1, Math.ceil((sleepEndsAt - Date.now()) / 60000)) + ' mnt';
+    else el.textContent = 'Timer';
+    btn.classList.toggle('on', !!(sleepAtEnd || sleepEndsAt));
+}
+function clearSleep() {
+    clearTimeout(sleepTimer); clearInterval(sleepTick);
+    sleepTimer = null; sleepTick = null; sleepEndsAt = 0; sleepAtEnd = false;
+    updateSleepLabel();
+}
+function setSleep(min) {
+    clearSleep();
+    closeSleepMenu();
+    if (min === 'end') { sleepAtEnd = true; showToast('Berhenti di akhir lagu'); }
+    else if (min > 0) {
+        sleepEndsAt = Date.now() + min * 60000;
+        sleepTimer = setTimeout(() => { userPaused = true; doPause(); clearSleep(); showToast('Timer tidur selesai'); }, min * 60000);
+        sleepTick = setInterval(updateSleepLabel, 15000);
+        showToast('Timer tidur ' + min + ' menit');
+    } else showToast('Timer tidur dimatikan');
+    updateSleepLabel();
+}
+function openSleepMenu() { document.getElementById('sleepModal').style.display = 'flex'; }
+function closeSleepMenu() { document.getElementById('sleepModal').style.display = 'none'; }
+
+// --- 11. NAVBAR KACA: geser untuk pindah halaman + melipat saat scroll ---
+const navEl = document.querySelector('.bottom-nav');
+const NAV_ORDER = ['home', 'search', 'library', 'developer'];
+let navCollapsed = false, navDragging = false, navMoved = false, navStartX = 0, navSuppressClick = false;
+
+function collapseSupported() { return !!(window.IKI_ENV && IKI_ENV.android && IKI_ENV.ver >= 13); }
+function collapseEnabled() { return collapseSupported() && pref.get('ikiCollapse', '1') !== '0'; }
+function setNavCollapsed(v) {
+    if (v && !collapseEnabled()) return;
+    if (navCollapsed === v) return;
+    navCollapsed = v;
+    navEl.classList.toggle('collapsed', v);
+    document.body.classList.toggle('nav-collapsed', v);
+}
+function navIdxFromX(x) {
+    const r = navEl.getBoundingClientRect();
+    const w = (r.width - 12) / 4;
+    return Math.min(3, Math.max(0, (x - r.left - 6) / w - 0.5));
+}
+navEl.addEventListener('pointerdown', (e) => {
+    if (navCollapsed) return;
+    navDragging = true; navMoved = false; navStartX = e.clientX;
+});
+window.addEventListener('pointermove', (e) => {
+    if (!navDragging) return;
+    if (!navMoved && Math.abs(e.clientX - navStartX) > 8) {
+        navMoved = true;
+        navEl.classList.add('dragging');
+        try { navEl.setPointerCapture(e.pointerId); } catch (err) {}
+    }
+    if (navMoved) navEl.style.setProperty('--idx', navIdxFromX(e.clientX));
+});
+function endNavDrag(e) {
+    if (!navDragging) return;
+    navDragging = false;
+    navEl.classList.remove('dragging');
+    if (navMoved) {
+        const i = Math.round(navIdxFromX(e.clientX));
+        switchView(NAV_ORDER[i]);
+        navSuppressClick = true;
+        setTimeout(() => { navSuppressClick = false; }, 80);
+    }
+    navMoved = false;
+}
+window.addEventListener('pointerup', endNavDrag);
+window.addEventListener('pointercancel', endNavDrag);
+navEl.addEventListener('click', (e) => {
+    if (navSuppressClick) { e.stopPropagation(); e.preventDefault(); return; }
+    if (navCollapsed) { e.stopPropagation(); e.preventDefault(); setNavCollapsed(false); }
+}, true);
+
+let lastScrollY = window.scrollY;
+window.addEventListener('scroll', () => {
+    const y = window.scrollY, dy = y - lastScrollY;
+    if (Math.abs(dy) < 6) return;
+    if (dy > 0 && y > 90) setNavCollapsed(true);
+    else if (dy < 0 || y < 40) setNavCollapsed(false);
+    lastScrollY = y;
+}, { passive: true });
+
+// --- 12. PENGATURAN TAMPILAN: kaca, font, ketebalan huruf ---
+const FONTS = [
+    { n: 'Bawaan sistem', f: null },
+    { n: 'Rubik', f: 'Rubik', s: '300..900' },
+    { n: 'Inter', f: 'Inter', s: '300..800' },
+    { n: 'Poppins', f: 'Poppins', s: '300;400;500;600;700;800' },
+    { n: 'Montserrat', f: 'Montserrat', s: '300..800' },
+    { n: 'Nunito', f: 'Nunito', s: '300..800' },
+    { n: 'Quicksand', f: 'Quicksand', s: '300..700' },
+    { n: 'Lexend', f: 'Lexend', s: '300..800' },
+    { n: 'DM Sans', f: 'DM Sans', s: '300..800' },
+    { n: 'Manrope', f: 'Manrope', s: '300..800' },
+    { n: 'Plus Jakarta Sans', f: 'Plus Jakarta Sans', s: '300..800' },
+    { n: 'Outfit', f: 'Outfit', s: '300..800' },
+    { n: 'Space Grotesk', f: 'Space Grotesk', s: '300..700' },
+    { n: 'Sora', f: 'Sora', s: '300..800' },
+    { n: 'Raleway', f: 'Raleway', s: '300..800' },
+    { n: 'Work Sans', f: 'Work Sans', s: '300..800' }
+];
+const FW_NAMES = { 300: 'Tipis', 400: 'Normal', 500: 'Sedang', 600: 'Tebal', 700: 'Sangat tebal' };
+const loadedFonts = {};
+
+function applyFont(i) {
+    const f = FONTS[i] || FONTS[0], root = document.documentElement;
+    if (!f.f) { root.style.removeProperty('--app-font'); return; }
+    if (!loadedFonts[f.f]) {
+        const l = document.createElement('link');
+        l.rel = 'stylesheet';
+        l.href = 'https://fonts.googleapis.com/css2?family=' + f.f.replace(/ /g, '+') + ':wght@' + f.s + '&display=swap';
+        document.head.appendChild(l);
+        loadedFonts[f.f] = true;
+    }
+    root.style.setProperty('--app-font', "'" + f.f + "', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif");
+}
+function setFontPref(i) { applyFont(+i); pref.set('ikiFont', i); }
+
+function applyWeight(w) {
+    const root = document.documentElement;
+    root.style.setProperty('--fw', w);
+    root.style.setProperty('--fwb', Math.min(900, w + 300));
+    root.classList.add('fw-custom');
+    const lab = document.getElementById('fwLabel'), sl = document.getElementById('setFw');
+    if (lab) lab.textContent = FW_NAMES[w] || w;
+    if (sl) { sl.value = w; sl.style.setProperty('--p', ((w - 300) / 400 * 100) + '%'); }
+}
+function setWeightPref(v) { v = +v; applyWeight(v); pref.set('ikiFw', v); }
+
+function setGlassPref(on) {
+    pref.set('ikiGlass', on ? 'full' : 'lite');
+    document.documentElement.classList.toggle('glass-full', on);
+    document.documentElement.classList.toggle('glass-lite', !on);
+}
+function setCollapsePref(on) {
+    pref.set('ikiCollapse', on ? '1' : '0');
+    if (!on) setNavCollapsed(false);
+}
+
+function syncSettingsUI() {
+    const g = document.getElementById('setGlass'), c = document.getElementById('setCollapse'), d = document.getElementById('setCollapseDesc');
+    if (g) g.checked = document.documentElement.classList.contains('glass-full');
+    if (c) {
+        c.disabled = !collapseSupported();
+        c.checked = collapseEnabled();
+        if (d) d.textContent = collapseSupported()
+            ? 'Navbar jadi lingkaran saat scroll ke bawah, mini player menempel di sebelahnya.'
+            : 'Khusus Android 13 ke atas.';
+    }
+}
+function initSettings() {
+    const sel = document.getElementById('setFont');
+    if (sel) sel.innerHTML = FONTS.map((f, i) => '<option value="' + i + '">' + f.n + '</option>').join('');
+    const fi = parseInt(pref.get('ikiFont', '0'), 10) || 0;
+    if (sel) sel.value = fi;
+    applyFont(fi);
+    const fw = pref.get('ikiFw', null);
+    if (fw !== null) applyWeight(+fw);
+    else { const sl = document.getElementById('setFw'); if (sl) sl.style.setProperty('--p', '25%'); }
+    const vb = document.getElementById('volumeBar');
+    if (vb) { vb.value = volume; vb.style.setProperty('--p', volume + '%'); }
+    syncSettingsUI();
+}
+document.addEventListener('iki-env', syncSettingsUI);
+
 window.onload = () => {
+    initSettings();
     loadHomeData();
     renderSearchCategories();
 };
