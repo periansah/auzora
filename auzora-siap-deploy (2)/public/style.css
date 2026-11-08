@@ -11,7 +11,7 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-family: var(--app-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif);
     -webkit-tap-highlight-color: transparent;
 }
 
@@ -457,3 +457,147 @@ body { background: transparent; padding-bottom: 180px; }
 /* Pilihan sumber musik di halaman Cari */
 .source-switch { display: flex; gap: 8px; padding: 0 16px 14px; flex-wrap: wrap; }
 .source-switch .pill { cursor: pointer; }
+
+
+/* =====================================================================
+   LIQUID GLASS v2 — navbar geser/melipat, kapsul pemutar, saklar, slider,
+   tombol cair, ikon tebal, font & ketebalan huruf
+   ===================================================================== */
+:root { --glass-hi: inset 0 1px 0 rgba(255,255,255,0.55), inset 0 -1px 0 rgba(255,255,255,0.08), inset 0 0 18px rgba(255,255,255,0.06); }
+
+/* ---------- Ikon lebih tebal & rapi ---------- */
+svg { stroke-linejoin: round; stroke-linecap: round; }
+svg path { stroke: currentColor; stroke-width: 0.9px; }
+svg[style*="fill:black"], svg[style*="fill: black"], .play-pause-btn svg, .lyrics-play-btn svg { color: #000; }
+svg[style*="--spotify-green"], .pin-icon, .lyric-btn.liked { color: var(--spotify-green); }
+svg[style*="--text-sub"] { color: var(--text-sub); }
+.dots-icon { color: rgba(255,255,255,0.65); }
+.search-icon-input { color: rgba(255,255,255,0.85); }
+.search-box-wrapper:focus-within .search-icon-input { color: var(--spotify-green); }
+.dev-card-title svg { color: rgba(255,255,255,0.75); }
+.lib-sort svg path { stroke-width: 0.4px; }
+
+/* ---------- Lensa (Chrome) ---------- */
+html.lens .bottom-nav, html.lens .mini-player, html.lens .glass-capsule {
+    -webkit-backdrop-filter: url(#lens) blur(10px) saturate(190%); backdrop-filter: url(#lens) blur(10px) saturate(190%);
+}
+
+/* ---------- Navbar: geser + melipat ---------- */
+.bottom-nav { height: 64px; touch-action: none; user-select: none; -webkit-user-select: none;
+    transition: right 0.55s var(--ease-spring), border-radius 0.55s var(--ease-spring); }
+.nav-item { min-width: 0; justify-content: center; transition: flex 0.5s var(--ease-spring), opacity 0.3s ease, color 0.3s ease, transform 0.3s var(--ease-spring), padding 0.4s ease; }
+.bottom-nav.dragging .nav-glider { transition: none; transform: translateX(calc(var(--idx, 0) * 100%)) scale(1.08, 1.16);
+    background: linear-gradient(135deg, rgba(255,255,255,0.42), rgba(255,255,255,0.14)); }
+.bottom-nav.collapsed { right: calc(100% - 78px); border-radius: 50%; }
+.bottom-nav.collapsed .nav-glider { opacity: 0; }
+.bottom-nav.collapsed .nav-item:not(.active) { flex: 0 0 0; width: 0; padding: 0; opacity: 0; overflow: hidden; pointer-events: none; }
+.bottom-nav.collapsed .nav-item.active { font-size: 0; gap: 0; padding: 0; height: 100%; }
+.bottom-nav.collapsed .nav-item.active svg { width: 28px; height: 28px; transform: none; }
+
+.mini-player { transition: bottom 0.55s var(--ease-spring), left 0.55s var(--ease-spring); }
+body.nav-collapsed .mini-player { left: 90px; bottom: calc(16px + env(safe-area-inset-bottom)); }
+body.nav-collapsed .mini-player-controls svg:first-child { display: none; }
+
+/* ---------- Kapsul kaca di pemutar ---------- */
+.player-extras { padding: 0 20px 26px; }
+.glass-capsule { display: flex; border-radius: 999px; overflow: hidden;
+    background: var(--glass-bg); border: 1px solid rgba(255,255,255,0.24); box-shadow: var(--glass-hi), 0 12px 30px rgba(0,0,0,0.4);
+    -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%); }
+.glass-capsule button { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 9px 2px 8px;
+    background: transparent; border: none; color: #fff; font-size: 11px; font-weight: 700; cursor: pointer; transition: transform 0.4s var(--ease-spring), background 0.3s ease; }
+.glass-capsule button + button { border-left: 1px solid rgba(255,255,255,0.12); }
+.glass-capsule button svg { width: 20px; height: 20px; fill: #fff; }
+.glass-capsule button:active { background: rgba(255,255,255,0.16); transform: scale(0.94, 0.9); }
+.glass-capsule button.on { color: #7dffb0; }
+.glass-capsule button.on svg { fill: #7dffb0; }
+.glass-capsule button span { white-space: nowrap; }
+
+/* ---------- Slider kaca (lagu, volume, ketebalan huruf) ---------- */
+.progress-bar { -webkit-appearance: none; appearance: none; width: 100%; height: 26px; border-radius: 0 !important; background: transparent !important; outline: none; --p: 0%; touch-action: pan-y; cursor: pointer; }
+.progress-bar::-webkit-slider-runnable-track { height: 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.22);
+    background: linear-gradient(to right, rgba(255,255,255,0.95) var(--p), rgba(255,255,255,0.16) var(--p));
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.4); }
+.progress-bar::-webkit-slider-thumb { -webkit-appearance: none; display: block !important; width: 24px; height: 24px; margin-top: -8px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 28%, #fff 0%, rgba(255,255,255,0.9) 45%, rgba(225,232,255,0.72) 100%);
+    border: 1px solid rgba(255,255,255,0.95);
+    box-shadow: inset 0 2px 3px #fff, inset 0 -4px 7px rgba(110,120,210,0.35), 0 4px 12px rgba(0,0,0,0.45);
+    transition: transform 0.35s var(--ease-spring); }
+.progress-bar:active::-webkit-slider-thumb { transform: scale(1.22, 1.12); }
+.progress-bar::-moz-range-track { height: 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.22);
+    background: linear-gradient(to right, rgba(255,255,255,0.95) var(--p), rgba(255,255,255,0.16) var(--p)); box-shadow: inset 0 1px 3px rgba(0,0,0,0.4); }
+.progress-bar::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; border: 1px solid #fff;
+    background: radial-gradient(circle at 35% 28%, #fff, rgba(225,232,255,0.75)); box-shadow: 0 4px 12px rgba(0,0,0,0.45); }
+.volume-container { display: flex; align-items: center; gap: 12px; padding: 0 24px; margin-bottom: 14px; }
+.volume-container svg { width: 20px; height: 20px; fill: rgba(255,255,255,0.85); flex-shrink: 0; }
+.volume-container .progress-bar { flex: 1; }
+.progress-container { margin-bottom: 8px; }
+.playback-controls { padding-bottom: 14px; }
+.player-art-container { margin-bottom: 10px; }
+.modal-header { padding-top: 32px; padding-bottom: 12px; }
+
+/* ---------- Saklar kaca ---------- */
+.glass-switch { -webkit-appearance: none; appearance: none; width: 54px; height: 32px; border-radius: 999px; position: relative; flex-shrink: 0; cursor: pointer; outline: none;
+    background: linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)); border: 1px solid rgba(255,255,255,0.22);
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.4), inset 0 -1px 0 rgba(255,255,255,0.12);
+    transition: background 0.35s ease, border-color 0.35s ease; }
+.glass-switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 28%, #fff, rgba(235,240,255,0.82)); box-shadow: inset 0 1px 2px #fff, 0 3px 8px rgba(0,0,0,0.45);
+    transition: transform 0.45s var(--ease-spring), width 0.25s ease; }
+.glass-switch:active::after { width: 30px; }
+.glass-switch:checked { background: linear-gradient(135deg, rgba(30,215,96,0.9), rgba(30,215,96,0.5)); border-color: rgba(150,255,190,0.65); }
+.glass-switch:checked::after { transform: translateX(22px); }
+.glass-switch:checked:active::after { transform: translateX(16px); }
+.glass-switch:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ---------- Baris pengaturan ---------- */
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.set-row.column { flex-direction: column; align-items: stretch; gap: 10px; }
+.set-name { font-size: 15px; font-weight: 600; color: #fff; }
+.set-desc { font-size: 12px; color: var(--text-sub); margin-top: 2px; line-height: 1.4; }
+.glass-select { width: 100%; padding: 12px 40px 12px 14px; border-radius: 16px; color: #fff; font-size: 15px; outline: none; -webkit-appearance: none; appearance: none;
+    background: rgba(255,255,255,0.1) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='white' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E") no-repeat right 12px center / 22px;
+    border: 1px solid rgba(255,255,255,0.22); box-shadow: var(--glass-hi); }
+.glass-select option { color: #000; }
+
+/* ---------- Lembar bawah (antrean, timer, menu lagu) ---------- */
+.track-menu { background: rgba(30,32,44,0.86); border-top: 1px solid rgba(255,255,255,0.22); box-shadow: inset 0 1px 0 rgba(255,255,255,0.3);
+    -webkit-backdrop-filter: blur(26px) saturate(180%); backdrop-filter: blur(26px) saturate(180%); }
+.queue-sheet { max-height: 78vh; overflow-y: auto; }
+.sheet-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; color: #fff; }
+.queue-label { font-size: 12px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-sub); margin: 14px 0 8px; }
+.queue-note { font-size: 13px; color: var(--text-sub); padding: 4px 2px; }
+.track-menu-item { border-radius: 14px; transition: transform 0.35s var(--ease-spring), background 0.3s ease; }
+.track-menu-item:active { background: rgba(255,255,255,0.12); transform: scale(0.97); }
+
+/* ---------- Tombol-tombol "cair" ---------- */
+.play-pause-btn { background: radial-gradient(120% 120% at 30% 20%, #fff, rgba(255,255,255,0.74)) !important;
+    box-shadow: inset 0 2px 3px #fff, inset 0 -7px 12px rgba(120,125,175,0.3), 0 10px 28px rgba(0,0,0,0.4) !important;
+    transition: transform 0.45s var(--ease-spring) !important; }
+.play-pause-btn:active { transform: scale(0.88, 0.8) !important; }
+.lyrics-play-btn { background: linear-gradient(135deg, rgba(60,235,120,0.95), rgba(30,215,96,0.7)); border: 1px solid rgba(190,255,215,0.6);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 6px 18px rgba(30,215,96,0.4); transition: transform 0.4s var(--ease-spring); }
+.lyrics-play-btn:active { transform: scale(0.86, 0.8); }
+.lyric-close { background: var(--glass-bg); border: 1px solid var(--glass-border); box-shadow: var(--glass-hi); transition: transform 0.4s var(--ease-spring); }
+.lyric-close:active { transform: scale(0.82, 0.76); }
+.cp-btn { transition: transform 0.4s var(--ease-spring); }
+.cp-btn:active { transform: scale(0.94, 0.88); }
+.cp-btn.cancel { background: var(--glass-bg); border: 1px solid var(--glass-border); box-shadow: var(--glass-hi); }
+.cp-btn.save { background: linear-gradient(135deg, rgba(60,235,120,0.95), rgba(30,215,96,0.7)); border: 1px solid rgba(190,255,215,0.6); box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 6px 18px rgba(30,215,96,0.35); }
+.cp-box { background: rgba(40,42,56,0.9); border: 1px solid rgba(255,255,255,0.18); box-shadow: var(--glass-hi); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
+.pill:active, .dev-cta-btn:active { transform: scale(0.93, 0.88); }
+
+/* ---------- Font & ketebalan huruf ---------- */
+html.fw-custom body, html.fw-custom .v-title, html.fw-custom .v-sub, html.fw-custom .h-sub, html.fw-custom .lib-item-title, html.fw-custom .lib-item-sub,
+html.fw-custom .mini-player-artist, html.fw-custom .player-artist, html.fw-custom .lyrics-track-artist, html.fw-custom .track-menu-item,
+html.fw-custom .pill, html.fw-custom .set-desc, html.fw-custom .dev-list li, html.fw-custom .search-box { font-weight: var(--fw, 400); }
+html.fw-custom .section-title, html.fw-custom .h-title, html.fw-custom .mini-player-title, html.fw-custom .player-title, html.fw-custom .lyrics-track-title,
+html.fw-custom .lib-title, html.fw-custom .pill.active, html.fw-custom .dev-card-title, html.fw-custom .set-name, html.fw-custom .lyrics-body,
+html.fw-custom .category-title, html.fw-custom .search-header-container h1, html.fw-custom .glass-capsule button { font-weight: var(--fwb, 700); }
+
+/* ---------- Kaca ringan (Android < 13 atau dimatikan di Pengaturan) ---------- */
+html.glass-lite *, html.glass-lite *::before, html.glass-lite *::after { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+html.glass-lite .bottom-nav, html.glass-lite .mini-player, html.glass-lite .glass-capsule { background: rgba(34,36,50,0.93); }
+html.glass-lite .home-header, html.glass-lite .lib-header { background: rgba(10,12,20,0.94); }
+html.glass-lite .track-menu { background: rgba(32,34,46,0.97); }
+html.glass-lite .v-item, html.glass-lite .lib-item, html.glass-lite .dev-card, html.glass-lite .search-box { background: rgba(255,255,255,0.08); }
+html.glass-lite .blob { animation: none; filter: blur(50px); }
