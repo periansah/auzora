@@ -186,7 +186,6 @@ function onPlayerStateChange(event) {
         playNextSimilarSong();
     }
     updateLyricsPlayIcon();
-    updateIsland();
 }
 
 function updateMediaSession() {
@@ -258,7 +257,7 @@ function resumeIfNeeded() {
 }
 document.addEventListener('visibilitychange', () => {
     if (document.hidden) setTimeout(resumeIfNeeded, 300);
-    else { resumeIfNeeded(); updateIsland(); }
+    else resumeIfNeeded();
 });
 window.addEventListener('pagehide', () => { /* biarkan audio berjalan */ });
 
@@ -333,7 +332,6 @@ function playMusic(videoId, encodedTrackData, fromHistory) {
         }
         setTimeout(startKeepAlive, 400);
     }
-    showIsland(true);
     
     document.getElementById('progressBar').value = 0;
     document.getElementById('currentTime').innerText = "0:00";
@@ -390,7 +388,6 @@ function startProgressBar() {
             progressBar.style.background = `linear-gradient(to right, white ${percent}%, rgba(255,255,255,0.2) ${percent}%)`;
             document.getElementById('currentTime').innerText = formatTime(current);
             document.getElementById('totalTime').innerText = formatTime(duration);
-            updateIslandProgress(current, duration);
             updatePositionState();
         }
     }, 1000);
@@ -406,97 +403,6 @@ function seekTo(value) {
     doSeek((value / 100) * duration);
     document.getElementById('progressBar').style.background = `linear-gradient(to right, white ${value}%, rgba(255,255,255,0.2) ${value}%)`;
 }
-
-// --- DYNAMIC BAR (gaya Dynamic Island) ---
-const ISLAND_HTML = `
-    <div class="di-compact" onclick="toggleIsland()">
-        <img id="diImg" class="di-cover" src="" alt="Cover">
-        <div class="di-text"><div id="diTitle" class="di-title">Judul Lagu</div><div id="diArtist" class="di-artist">Artis</div></div>
-        <div class="di-eq" id="diEq" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-    </div>
-    <div class="di-expanded">
-        <div class="di-progress" onclick="islandSeek(event)"><div class="di-progress-fill" id="diProgressFill"></div></div>
-        <div class="di-times"><span id="diCur">0:00</span><span id="diTot">0:00</span></div>
-        <div class="di-controls">
-            <svg viewBox="0 0 24 24" onclick="openLyricsForCurrent()" aria-label="Lirik"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 20V4h6v6h6v10H6zm2-7h8v2H8v-2zm0 4h5v2H8v-2z"></path></svg>
-            <svg viewBox="0 0 24 24" onclick="playPrev()" aria-label="Sebelumnya"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"></path></svg>
-            <div class="di-play" onclick="togglePlay()" aria-label="Putar/Jeda"><svg id="diPlayBtn" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg></div>
-            <svg viewBox="0 0 24 24" onclick="playNextSimilarSong()" aria-label="Berikutnya"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"></path></svg>
-            <svg viewBox="0 0 24 24" onclick="expandPlayer()" aria-label="Buka pemutar"><path d="M21 11V3h-8l3.29 3.29-10 10L3 13v8h8l-3.29-3.29 10-10z"></path></svg>
-        </div>
-    </div>`;
-
-function ensureIsland() {
-    let el = document.getElementById('dynIsland');
-    if (!el) {   // index.html masih versi lama -> buat sendiri
-        el = document.createElement('div');
-        el.id = 'dynIsland';
-        el.className = 'dyn-island';
-        el.dataset.state = 'hidden';
-        el.innerHTML = ISLAND_HTML;
-        document.body.appendChild(el);
-    }
-    try { if (getComputedStyle(el).position !== 'fixed') el.style.display = 'none'; } catch (e) {}   // CSS lama -> sembunyikan
-    return el;
-}
-const islandEl = ensureIsland();
-let islandOpenedAt = 0;
-let islandTimer;
-
-// true hanya jika style.css terbaru sudah termuat (kalau belum, bar disembunyikan & mini player lama dipakai)
-function islandStyled() {
-    try { return getComputedStyle(islandEl).position === 'fixed'; } catch (e) { return false; }
-}
-
-function setIslandState(state) {
-    islandEl.dataset.state = state;
-    if (state === 'expanded') islandOpenedAt = Date.now();
-    clearTimeout(islandTimer);
-    if (state === 'expanded') islandTimer = setTimeout(() => setIslandState('compact'), 7000);
-}
-function showIsland(autoExpand) {
-    try {
-        if (!islandStyled()) { islandEl.style.display = 'none'; return; }
-        document.body.classList.add('has-island');
-        document.getElementById('diImg').src = currentTrack.img;
-        document.getElementById('diTitle').innerText = currentTrack.title;
-        document.getElementById('diArtist').innerText = currentTrack.artist;
-        document.getElementById('diProgressFill').style.width = '0%';
-        document.getElementById('diCur').innerText = '0:00';
-        document.getElementById('diTot').innerText = '0:00';
-        setIslandState(autoExpand ? 'expanded' : 'compact');
-    } catch (e) { console.log('island error', e); }
-}
-function toggleIsland() {
-    setIslandState(islandEl.dataset.state === 'expanded' ? 'compact' : 'expanded');
-}
-function updateIsland() {
-    try {
-        islandEl.classList.toggle('is-playing', isPlaying);
-        const icon = document.getElementById('diPlayBtn');
-        if (icon) icon.innerHTML = `<path d="${isPlaying ? ICON_PAUSE : ICON_PLAY}"></path>`;
-    } catch (e) {}
-}
-function updateIslandProgress(cur, dur) {
-    try {
-        if (dur <= 0) return;
-        document.getElementById('diProgressFill').style.width = (cur / dur * 100) + '%';
-        document.getElementById('diCur').innerText = formatTime(cur);
-        document.getElementById('diTot').innerText = formatTime(dur);
-    } catch (e) {}
-}
-function islandSeek(e) {
-    const dur = getDur();
-    if (dur <= 0) return;
-    const r = e.currentTarget.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
-    doSeek(ratio * dur);
-    updateIslandProgress(ratio * dur, dur);
-    setIslandState('expanded');
-}
-document.addEventListener('click', (e) => {
-    if (islandEl.dataset.state === 'expanded' && !islandEl.contains(e.target) && Date.now() - islandOpenedAt > 500) setIslandState('compact');
-});
 
 // --- CUSTOM TOAST NOTIFICATION ---
 let toastTimeout;
@@ -1077,4 +983,3 @@ window.onload = () => {
 
 // API YouTube bisa selesai dimuat lebih dulu daripada file ini (sering terjadi di HP) -> mulai pemutar sendiri
 if (window.YT && window.YT.Player && !ytPlayer) onYouTubeIframeAPIReady();
-
