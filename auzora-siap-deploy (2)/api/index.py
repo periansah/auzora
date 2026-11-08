@@ -237,17 +237,49 @@ def _find(o, key):
 def _spotify(path: str):
     m = re.search(r"/(playlist|album)/([A-Za-z0-9]+)", path)
     if not m:
-        raise ValueError("Link Spotify tidak dikenali")
-    html = _fetch(f"https://open.spotify.com/embed/{m.group(1)}/{m.group(2)}")
+        raise ValueError("Link Spotify tidak dikenali. Gunakan link playlist atau album")
+    html = ""
+    for suffix in ("", "?utm_source=oembed"):          # coba dua bentuk URL embed
+        try:
+            html = _fetch(f"https://open.spotify.com/embed/{m.group(1)}/{m.group(2)}{suffix}")
+        except Exception:
+            continue
+        if "__NEXT_DATA__" in html:
+            break
     nd = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.S)
     if not nd:
-        raise ValueError("Playlist Spotify tidak bisa dibaca (mungkin privat)")
+        raise ValueError("Playlist Spotify tidak bisa dibaca (privat, atau playlist buatan Spotify seperti Daily Mix)")
     data = json.loads(nd.group(1))
     ent = _find(data, "entity") or {}
     tl = _find(data, "trackList") or []
     cover = ((ent.get("coverArt") or {}).get("sources") or [{}])[0].get("url", "")
-    tracks = [{"title": t.get("title", ""), "artist": t.get("subtitle", "")} for t in tl[:100] if t.get("title")]
-    return {"name": ent.get("name") or ent.get("title") or "Playlist Spotify", "img": cover, "tracks": tracks}
+    seen, tracks = set(), []
+    for t in tl:
+        title = (t.get("title") or "").strip()
+        artist = (t.get("subtitle") or "").replace("\xa0", " ").strip()
+        if not title or (title, artist) in seen:
+            continue
+        seen.add((title, artist))
+        tracks.append({"title": title, "artist": artist})
+        if len(tracks) >= 100:
+            break
+    if not tracks:
+        raise ValueError("Tidak ada lagu yang terbaca dari playlist ini")
+    return {"name": ent.get("name") or ent.get("title") or "Playlist Spotify", "img": cover, "tracks": tracks,
+            "truncated": len(tl) >= 100}
+
+
+def _resolve_spotify_short(url: str) -> str:
+    """spotify.link / spoti.fi -> URL open.spotify.com yang sebenarnya."""
+    req = urllib.request.Request(url, headers=UA)
+    with urllib.request.urlopen(req, timeout=8) as r:
+        final = r.geturl()
+        body = r.read(200000).decode("utf-8", "ignore")
+    for cand in (final, body):
+        m = re.search(r"https?://open\.spotify\.com/(?:intl-[a-z-]+/)?(playlist|album)/[A-Za-z0-9]+", cand)
+        if m:
+            return m.group(0)
+    raise ValueError("Link pendek Spotify tidak bisa diurai. Buka linknya lalu salin link lengkapnya")
 
 
 def _apple(url: str):
@@ -276,6 +308,9 @@ def import_playlist(url: str):
     try:
         u = urlparse(url.strip())
         host = (u.hostname or "").lower()
+        if host in ("spotify.link", "spoti.fi", "link.tospotify.com"):
+            u = urlparse(_resolve_spotify_short(url.strip()))
+            host = (u.hostname or "").lower()
         if host == "open.spotify.com":
             data = _spotify(u.path)
         elif host in ("music.apple.com", "itunes.apple.com"):
