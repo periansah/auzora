@@ -913,11 +913,19 @@ async function openLyrics(track, followPlayer) {
     lyricsModal.style.display = 'flex';
     lyricsBody.scrollTop = 0;
     if (track.src === 'audius') { setLyricsMessage('Lirik belum tersedia untuk lagu dari Audius.'); return; }
-    setLyricsMessage('Menarik data lirik dari server... ⏳');
+    setLyricsMessage('Memuat lirik...');
 
     try {
-        const response = await fetch(`/api/lyrics?video_id=${encodeURIComponent(track.videoId)}`);
+        let dur = 0;   // tunggu durasi lagu (maks. 3 dtk) supaya lirik yang dipilih cocok dengan durasinya
+        for (let k = 0; k < 7; k++) {
+            if (!currentTrack || currentTrack.videoId !== track.videoId) break;
+            dur = Math.round(getDur()); if (dur > 0) break;
+            await new Promise(r => setTimeout(r, 450));
+        }
+        if (reqId !== lyricsRequestId) return;
+        const response = await fetch(`/api/lyrics?video_id=${encodeURIComponent(track.videoId)}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}&duration=${dur}`);
         const result = await response.json();
+        window._lyrData = (result.status === 'success' && result.data) ? result.data : null;
         if (reqId !== lyricsRequestId) return; // pengguna sudah pindah lagu / menutup modal
 
         if (result.status === 'success' && result.data && result.data.lyrics) {
@@ -933,7 +941,7 @@ async function openLyrics(track, followPlayer) {
         }
     } catch (e) {
         if (reqId !== lyricsRequestId) return;
-        setLyricsMessage('Gagal memuat lirik. Periksa koneksi internet.', true);
+        setLyricsMessage('Gagal memuat lirik. Periksa koneksi internet kamu.', true);
     }
 }
 

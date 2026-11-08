@@ -235,12 +235,25 @@ try { navigator.mediaSession.setActionHandler('enterpictureinpicture', () => sma
 
 /* ---------- Terjemahan lirik (Google gratis / DeepL via backend) ---------- */
 const LANGS = [['id', 'Indonesia'], ['en', 'Inggris'], ['ja', 'Jepang'], ['ko', 'Korea'], ['es', 'Spanyol'], ['fr', 'Prancis'], ['de', 'Jerman'], ['ar', 'Arab'], ['zh-CN', 'Mandarin'], ['pt', 'Portugis'], ['ru', 'Rusia'], ['hi', 'Hindi'], ['th', 'Thai'], ['ms', 'Melayu']];
-let lyrText = '';
+const phoneLang = (() => { const l = (navigator.language || 'id').split('-')[0].toLowerCase(); if (l === 'zh') return 'zh-CN'; return LANGS.some(x => x[0] === l) ? l : 'id'; })();
+let lyrText = '', synced = null, syncIdx = -1;
 const _ol = window.openLyrics;
 window.openLyrics = async function () {
-    lyrText = ''; await _ol.apply(this, arguments);
-    if (!lyricsBody.querySelector('.lyrics-msg') && lyricsBody.firstChild) lyrText = lyricsBody.firstChild.textContent || '';
+    lyrText = ''; synced = null; syncIdx = -1; window._lyrData = null; await _ol.apply(this, arguments);
+    const D = window._lyrData, ok = !lyricsBody.querySelector('.lyrics-msg');
+    if (ok && D && D.synced && D.synced.length) {
+        synced = D.synced; lyrText = D.lyrics || ''; lyricsBody.textContent = '';
+        D.synced.forEach(r => { const d = el('<div class="lyr-line"></div>'); d.textContent = r[1] || '♪'; d.dataset.t = r[0]; lyricsBody.appendChild(d); });
+        if (D.source) { const s = el('<span class="lyrics-source"></span>'); s.textContent = D.source; lyricsBody.appendChild(s); }
+    } else if (ok && lyricsBody.firstChild) lyrText = lyricsBody.firstChild.textContent || '';
 };
+function syncLyrics() {
+    if (!synced || lyricsModal.style.display !== 'flex' || !currentTrack || !lyricsTrack || currentTrack.videoId !== lyricsTrack.videoId) return;
+    const c = getCur() + .3; let i = -1; for (let k = 0; k < synced.length; k++) { if (synced[k][0] <= c) i = k; else break; }
+    if (i === syncIdx) return; syncIdx = i;
+    const ls = $$('.lyr-line', lyricsBody); ls.forEach((e, k) => e.classList.toggle('on', k === i));
+    if (ls[i]) ls[i].scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
 async function googleTr(text, tl) {
     const lines = text.split('\n'), chunks = []; let c = '';
     lines.forEach(l => { if ((c + l).length > 1500) { chunks.push(c); c = ''; } c += l + '\n'; }); if (c) chunks.push(c);
@@ -265,7 +278,7 @@ function showTranslation(orig, tr) {
 }
 function trSheet() {
     if (!lyrText) { showToast('Lirik belum tersedia untuk diterjemahkan.'); return; }
-    const o = sheet('<div class="sheet-title">Terjemahkan lirik</div><label>Ke bahasa</label><select id="auTl">' + LANGS.map(l => '<option value="' + l[0] + '"' + (l[0] === pref.get('auTl', 'id') ? ' selected' : '') + '>' + l[1] + '</option>').join('') + '</select>' +
+    const o = sheet('<div class="sheet-title">Terjemahkan lirik</div><label>Ke bahasa</label><select id="auTl">' + LANGS.map(l => '<option value="' + l[0] + '"' + (l[0] === pref.get('auTl', phoneLang) ? ' selected' : '') + '>' + l[1] + '</option>').join('') + '</select>' +
         '<label>Penerjemah: ' + (pref.get('auTp', 'google') === 'deepl' ? 'DeepL' : 'Google Terjemahan (gratis)') + ' — ubah di Developer › Tampilan</label><div class="au-row" style="margin-top:16px"><button class="au-btn" id="auDoTr">Terjemahkan</button><button class="au-btn ghost" id="auUnTr">Tampilkan asli</button></div>');
     $('#auDoTr', o).onclick = async () => {
         const tl = $('#auTl', o).value; pref.set('auTl', tl); closeSheet(); showToast('Menerjemahkan...');
@@ -424,6 +437,44 @@ function initSettingsCard() {
     const tp = $('#auTp'), dk = $('#auDk'); tp.value = pref.get('auTp', 'google'); dk.value = pref.get('auDk', ''); dk.style.display = tp.value === 'deepl' ? 'block' : 'none';
     tp.onchange = () => { pref.set('auTp', tp.value); dk.style.display = tp.value === 'deepl' ? 'block' : 'none'; }; dk.oninput = () => pref.set('auDk', dk.value.trim());
 }
+
+/* ---------- Playlist/album: tombol putar⇄jeda dan lanjut rekomendasi setelah habis ---------- */
+let ctx = null;
+const inList = (L) => !!(L && currentTrack && L.some(t => t.videoId === currentTrack.videoId));
+window.playFirstPlaylistTrack = function () {
+    const L = currentPlaylistTracks; if (!L || !L.length) return;
+    if (ctx && inList(L) && inList(ctx.tracks)) { togglePlay(); return; }
+    ctx = { tracks: L.slice() }; playMusic(L[0].videoId, encTrack(L[0]));
+};
+const _pm2 = window.playMusic;
+window.playMusic = function (id) { _pm2.apply(this, arguments); if (ctx && !ctx.tracks.some(t => t.videoId === id)) ctx = null; };
+const _pn = window.playNextSimilarSong;
+window.playNextSimilarSong = function () {
+    if (ctx && currentTrack) {
+        const i = ctx.tracks.findIndex(t => t.videoId === currentTrack.videoId);
+        if (i >= 0 && i < ctx.tracks.length - 1) { const n = ctx.tracks[i + 1]; playMusic(n.videoId, encTrack(n)); return; }
+        if (i >= 0) { ctx = null; showToast('Playlist selesai, lanjut rekomendasi'); }
+    }
+    return _pn.apply(this, arguments);
+};
+const _sv = window.switchView;
+window.switchView = function (v) { _sv.apply(this, arguments); document.documentElement.dataset.view = v; if (v === 'search' && document.activeElement && document.activeElement.blur) document.activeElement.blur(); };
+document.documentElement.dataset.view = 'home';
+function syncPlaylistBtn() {
+    const b = $('#view-playlist .play-pause-btn[onclick*="playFirstPlaylistTrack"] svg'); if (!b) return;
+    b.innerHTML = '<path d="' + ((isPlaying && ctx && inList(currentPlaylistTracks) && inList(ctx.tracks)) ? IC.pause : IC.play) + '"/>';
+}
+/* lagu jeda sendiri karena gangguan suara -> lanjutkan (kecuali pengguna yang menjeda) */
+let lastPlayAt = Date.now(), resumeTry = 0;
+function guardResume() {
+    if (isPlaying) { lastPlayAt = Date.now(); resumeTry = 0; return; }
+    if (!currentTrack || userPaused || resumeTry >= 3) return;
+    const gap = Date.now() - lastPlayAt; if (gap < 1200 || gap > 20000) return;
+    const paused = useAudio ? (audioEl.paused && !audioEl.ended && audioEl.readyState > 0) : !!(ytPlayer && ytPlayer.getPlayerState && ytPlayer.getPlayerState() === 2);
+    if (paused) { resumeTry++; doPlay(); }
+}
+document.addEventListener('click', e => { if (e.target.closest('#playlistTracksContainer .v-item') && !e.target.closest('.dots-icon')) ctx = { tracks: (currentPlaylistTracks || []).slice() }; }, true);
+setInterval(() => { syncLyrics(); syncPlaylistBtn(); guardResume(); }, 700);
 
 /* ---------- init ---------- */
 function init() {

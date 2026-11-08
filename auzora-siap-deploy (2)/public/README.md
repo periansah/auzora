@@ -53,3 +53,10 @@ Untuk frontend + API sekaligus seperti di Vercel, paling mudah pakai `vercel dev
 - **Pencarian**: Terakhir diputar, Paling sering diputar, Artis favorit, Genre pilihan.
 - **Bagikan lirik sebagai gambar** (4 latar, Square/Story, font, ketebalan, rata teks, warna) dan **terjemahan lirik** (Google gratis; DeepL lewat `POST /api/deepl`).
 - **Mode Ambient** (tombol di pemutar), **widget Auralys Glass**, **artwork beranimasi** (default mati).
+
+## v3.3.2 — Perbaikan
+- Pengaturan: efek lensa & blur berat dimatikan di halaman itu (penyebab crash di mode kaca penuh), animasi latar dijeda.
+- Latar diperluas (tidak ada pita hitam), pemudar di belakang mini player & navbar, kolom cari lebih kecil dan keyboard tidak muncul sendiri.
+- Tombol putar playlist ⇄ jeda; setelah playlist habis lanjut rekomendasi dari lagu terakhir.
+- Lirik: dipilih yang tersinkron (LRCLIB) dan durasinya cocok; baris aktif ikut menyorot. Bahasa terjemahan default mengikuti bahasa HP.
+- Lagu yang terjeda sendiri karena gangguan suara dilanjutkan otomatis (maks. 3 kali), kecuali pengguna yang menjeda.
