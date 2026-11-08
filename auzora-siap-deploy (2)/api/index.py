@@ -3,7 +3,7 @@ import json
 import re
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 from fastapi import Body, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -92,9 +92,42 @@ def get_home_data(response: Response):
         return error(str(e))
 
 
+def _lrclib(title: str, artist: str, duration: int):
+    """Cari lirik tersinkron (LRC) yang durasinya cocok dengan lagu (toleransi 4 detik)."""
+    items = json.loads(_fetch("https://lrclib.net/api/search?" + urlencode({"track_name": title, "artist_name": artist})))
+    best = None
+    for it in items:
+        if not it.get("syncedLyrics"):
+            continue
+        d = it.get("duration") or 0
+        if duration and abs(d - duration) > 4:
+            continue
+        score = abs(d - duration) if duration else 0
+        if best is None or score < best[0]:
+            best = (score, it)
+    if not best:
+        return None
+    synced = []
+    for ln in best[1]["syncedLyrics"].splitlines():
+        m = re.match(r"\[(\d+):(\d+(?:\.\d+)?)\]\s*(.*)", ln)
+        if m:
+            synced.append([round(int(m.group(1)) * 60 + float(m.group(2)), 2), m.group(3)])
+    if not synced:
+        return None
+    return {"lyrics": "\n".join(t for _, t in synced), "synced": synced, "source": "LRCLIB • tersinkron"}
+
+
 @app.get("/api/lyrics")
-def get_lyrics(video_id: str, response: Response):
+def get_lyrics(video_id: str, response: Response, title: str = "", artist: str = "", duration: int = 0):
     try:
+        if title:
+            try:
+                found = _lrclib(title, artist, duration)
+                if found:
+                    response.headers["Cache-Control"] = CACHE_LYRICS
+                    return {"status": "success", "data": found}
+            except Exception:
+                pass
         watch = ytmusic.get_watch_playlist(videoId=video_id, limit=1)
         lyrics_id = watch.get("lyrics")
         if not lyrics_id:
