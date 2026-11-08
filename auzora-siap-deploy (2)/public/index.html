@@ -6,12 +6,45 @@
     <title>iki - Music & Lyrics</title>
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#07080d">
+    <script>
+    /* Deteksi perangkat: Android < 13 -> kaca ringan; lainnya -> kaca penuh (blur + lensa) */
+    (function(){
+        var d=document.documentElement,ua=navigator.userAgent||'',m=ua.match(/Android\s+(\d+)/);
+        var env=window.IKI_ENV={android:!!m,ver:m?parseInt(m[1],10):0};
+        var pref=null;try{pref=localStorage.getItem('ikiGlass');}catch(e){}
+        function apply(){
+            var full=pref?pref==='full':!(env.android&&env.ver<13);
+            d.classList.toggle('glass-full',full);d.classList.toggle('glass-lite',!full);
+        }
+        if(/Chrome\//.test(ua)&&!/Edg|OPR/.test(ua))d.classList.add('lens');
+        apply();
+        /* Chrome menyamarkan versi Android di User-Agent -> ambil versi asli lewat userAgentData */
+        if(navigator.userAgentData&&navigator.userAgentData.getHighEntropyValues){
+            navigator.userAgentData.getHighEntropyValues(['platformVersion']).then(function(v){
+                if(navigator.userAgentData.platform==='Android'){
+                    env.android=true;env.ver=parseInt(v.platformVersion,10)||env.ver;
+                    apply();document.dispatchEvent(new Event('iki-env'));
+                }
+            }).catch(function(){});
+        }
+    })();
+    </script>
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/174/174872.png">
     
-    <link rel="stylesheet" href="/style.css?v=321">
+    <link rel="stylesheet" href="/style.css?v=322">
     <script src="https://www.youtube.com/iframe_api"></script>
 </head>
 <body>
+
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+        <defs>
+            <filter id="lens" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+                <feTurbulence type="fractalNoise" baseFrequency="0.011 0.018" numOctaves="1" seed="4" result="n"/>
+                <feGaussianBlur in="n" stdDeviation="2.2" result="nb"/>
+                <feDisplacementMap in="SourceGraphic" in2="nb" scale="20" xChannelSelector="R" yChannelSelector="G"/>
+            </filter>
+        </defs>
+    </svg>
 
     <div class="ambient" aria-hidden="true">
         <span class="blob b1"></span>
@@ -156,6 +189,38 @@
 
             <div class="dev-card">
                 <div class="dev-card-title">
+                    <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"></path></svg>
+                    Pengaturan
+                </div>
+                <div class="set-row">
+                    <div>
+                        <div class="set-name">Efek kaca penuh</div>
+                        <div class="set-desc">Blur dan efek lensa. Matikan untuk tampilan kaca yang lebih ringan.</div>
+                    </div>
+                    <input type="checkbox" class="glass-switch" id="setGlass" onchange="setGlassPref(this.checked)">
+                </div>
+                <div class="set-row">
+                    <div>
+                        <div class="set-name">Navbar melipat saat scroll</div>
+                        <div class="set-desc" id="setCollapseDesc">Navbar jadi lingkaran saat scroll ke bawah, mini player menempel di sebelahnya.</div>
+                    </div>
+                    <input type="checkbox" class="glass-switch" id="setCollapse" onchange="setCollapsePref(this.checked)">
+                </div>
+                <div class="set-row column">
+                    <div class="set-name">Font</div>
+                    <select id="setFont" class="glass-select" onchange="setFontPref(this.value)"></select>
+                </div>
+                <div class="set-row column" style="border-bottom:none; padding-bottom:0;">
+                    <div style="display:flex; justify-content:space-between; align-items:baseline;">
+                        <div class="set-name">Ketebalan huruf</div>
+                        <div class="set-desc" id="fwLabel" style="margin:0;">Normal</div>
+                    </div>
+                    <input type="range" id="setFw" class="progress-bar" min="300" max="700" step="100" value="400" oninput="setWeightPref(this.value)" aria-label="Ketebalan huruf">
+                </div>
+            </div>
+
+            <div class="dev-card">
+                <div class="dev-card-title">
                     <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"></path></svg>
                     Informasi Project
                 </div>
@@ -263,14 +328,30 @@
                 <svg viewBox="0 0 24 24" style="fill:var(--text-sub); width:24px; height:24px;"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"></path></svg>
             </div>
 
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 24px 30px;">
-                <button class="player-lyrics-btn" onclick="openLyricsForCurrent()">
-                    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 20V4h6v6h6v10H6zm2-7h8v2H8v-2zm0 4h5v2H8v-2z"></path></svg>
-                    Lirik
-                </button>
-                <div style="display: flex; gap: 24px;">
-                    <svg viewBox="0 0 24 24" style="fill:white; width:20px; height:20px;"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"></path></svg>
-                    <svg viewBox="0 0 24 24" style="fill:white; width:20px; height:20px;"><path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"></path></svg>
+            <div class="volume-container">
+                <svg viewBox="0 0 24 24" aria-label="Volume kecil"><path d="M7 9v6h4l5 5V4l-5 5H7z"></path></svg>
+                <input type="range" id="volumeBar" class="progress-bar" value="100" min="0" max="100" step="1" oninput="setVolume(this.value)" aria-label="Volume">
+                <svg viewBox="0 0 24 24" aria-label="Volume besar"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"></path></svg>
+            </div>
+
+            <div class="player-extras">
+                <div class="glass-capsule">
+                    <button onclick="openLyricsForCurrent()">
+                        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 20V4h6v6h6v10H6zm2-7h8v2H8v-2zm0 4h5v2H8v-2z"></path></svg>
+                        <span>Lirik</span>
+                    </button>
+                    <button onclick="openQueue()">
+                        <svg viewBox="0 0 24 24"><path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"></path></svg>
+                        <span>Antrean</span>
+                    </button>
+                    <button onclick="shareCurrent()">
+                        <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"></path></svg>
+                        <span>Bagikan</span>
+                    </button>
+                    <button id="sleepBtn" onclick="openSleepMenu()">
+                        <svg viewBox="0 0 24 24"><path d="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61 1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"></path></svg>
+                        <span id="sleepLabel">Timer</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -322,6 +403,25 @@
         </div>
     </div>
 
+    <div id="queueModal" class="modal-overlay" style="display:none; justify-content:flex-end; background: rgba(0,0,0,0.8);" onclick="closeQueue()">
+        <div class="track-menu queue-sheet" onclick="event.stopPropagation()">
+            <div class="sheet-title">Antrean</div>
+            <div id="queueBody" class="vertical-list" style="padding:0;"></div>
+        </div>
+    </div>
+
+    <div id="sleepModal" class="modal-overlay" style="display:none; justify-content:flex-end; background: rgba(0,0,0,0.8);" onclick="closeSleepMenu()">
+        <div class="track-menu" onclick="event.stopPropagation()">
+            <div class="sheet-title">Timer tidur</div>
+            <div class="track-menu-item" onclick="setSleep(15)">15 menit</div>
+            <div class="track-menu-item" onclick="setSleep(30)">30 menit</div>
+            <div class="track-menu-item" onclick="setSleep(45)">45 menit</div>
+            <div class="track-menu-item" onclick="setSleep(60)">60 menit</div>
+            <div class="track-menu-item" onclick="setSleep('end')">Berhenti di akhir lagu</div>
+            <div class="track-menu-item" onclick="setSleep(0)">Matikan timer</div>
+        </div>
+    </div>
+
     <div id="createPlaylistModal" style="display:none;">
         <div class="modal-overlay" style="display:flex;">
             <div class="cp-box">
@@ -353,6 +453,6 @@
 
     <div id="youtube-player"></div>
 
-    <script src="/script.js?v=321"></script>
+    <script src="/script.js?v=322"></script>
 </body>
 </html>
